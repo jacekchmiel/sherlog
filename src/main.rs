@@ -23,9 +23,23 @@ struct App {
     active_highlight_pattern: Option<String>,
 }
 
+enum SearchKind {
+    Highlight,
+    Search,
+}
+
+impl Display for SearchKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            SearchKind::Highlight => "highlight",
+            SearchKind::Search => "search",
+        })
+    }
+}
+
 enum StatusLine {
     Command(String),
-    SearchPattern(String),
+    SearchPattern(SearchKind, String), // header, pattern
     Status(String),
 }
 
@@ -37,12 +51,11 @@ impl StatusLine {
 
 impl Display for StatusLine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let text = match self {
-            StatusLine::Command(s) => s,
-            StatusLine::SearchPattern(s) => s,
-            StatusLine::Status(s) => s,
-        };
-        f.write_str(text)
+        match self {
+            StatusLine::Command(s) => f.write_str(s),
+            StatusLine::SearchPattern(h, s) => write!(f, "{} /{}", h, s),
+            StatusLine::Status(s) => f.write_str(s),
+        }
     }
 }
 
@@ -73,10 +86,9 @@ impl App {
     pub fn on_user_input(&mut self, input: char) {
         match &mut self.status {
             StatusLine::Command(c) => c.push(input),
-            StatusLine::SearchPattern(p) => p.push(input),
+            StatusLine::SearchPattern(_, p) => p.push(input),
             StatusLine::Status(_) => match input {
                 ':' => self.status = StatusLine::Command(String::from(input)),
-                '/' => self.status = StatusLine::SearchPattern(String::from(input)),
                 _ => {}
             },
         };
@@ -84,7 +96,7 @@ impl App {
 
     pub fn on_backspace(&mut self) {
         match &mut self.status {
-            StatusLine::Command(text) | StatusLine::SearchPattern(text) => {
+            StatusLine::Command(text) | StatusLine::SearchPattern(_, text) => {
                 text.pop();
             }
             StatusLine::Status(_) => {
@@ -96,9 +108,12 @@ impl App {
     pub fn on_enter(&mut self) {
         match &self.status {
             StatusLine::Command(command) => self.process_command(&command[1..].to_owned()),
-            StatusLine::SearchPattern(pattern) => {
-                self.register_search_pattern(pattern[1..].to_owned());
+            StatusLine::SearchPattern(SearchKind::Highlight, pattern) => {
+                self.active_highlight_pattern = Some(pattern.to_owned());
                 self.clear_status();
+            }
+            StatusLine::SearchPattern(SearchKind::Search, _) => {
+                todo!();
             }
             StatusLine::Status(_) => self.clear_status(),
         }
@@ -112,17 +127,14 @@ impl App {
         let mut err: Option<String> = None;
         match command {
             "q" | "quit" => self.wants_quit = true,
+            "h" | "highlight" => {
+                self.status = StatusLine::SearchPattern(SearchKind::Highlight, String::new())
+            }
             other => err = Some(format!("Unknown command: {}", other)),
         }
         if let Some(msg) = err {
             self.print_error(msg);
-        } else {
-            self.clear_status()
         }
-    }
-
-    pub fn register_search_pattern(&mut self, pattern: String) {
-        self.active_highlight_pattern = Some(pattern)
     }
 
     pub fn process_search(&mut self) -> HashMap<usize, Vec<FindRange>> {

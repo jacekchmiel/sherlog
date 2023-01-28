@@ -12,6 +12,7 @@ plugin or full-blown standalone GUI.
 ### MVP
 
  - [x] less-like interface with basic scrolling
+ - [x] highlighting with regex
  - [ ] filtering with regex (single filter)
  - [ ] filtering with regex (multiple negative and positive filters)
    - [ ] active filter list with ability to add remove
