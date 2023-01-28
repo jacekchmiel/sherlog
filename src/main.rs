@@ -18,13 +18,11 @@ struct App {
     view_offset: usize,
     status: StatusLine,
     wants_quit: bool,
-    view_height: usize,
     filter_is_highlight: bool,
 }
 
 enum SearchKind {
     Highlight,
-    Search,
     Filter,
 }
 
@@ -32,7 +30,6 @@ impl Display for SearchKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
             SearchKind::Highlight => "highlight",
-            SearchKind::Search => "search",
             SearchKind::Filter => "filter",
         })
     }
@@ -61,13 +58,12 @@ impl Display for StatusLine {
 }
 
 impl App {
-    pub fn new(core: Sherlog, terminal_height: usize) -> Self {
+    pub fn new(core: Sherlog) -> Self {
         App {
             core,
             view_offset: 0,
             status: StatusLine::Status(String::from("Type `:` to start command")),
             wants_quit: false,
-            view_height: terminal_height - 1,
             filter_is_highlight: false,
         }
     }
@@ -145,9 +141,6 @@ impl App {
                     }
                 }
             }
-            StatusLine::SearchPattern(SearchKind::Search, _) => {
-                todo!();
-            }
             StatusLine::Status(_) => self.clear_status(),
         }
     }
@@ -172,15 +165,6 @@ impl App {
             self.print_error(msg);
         }
     }
-
-    // pub fn get_highlight_ranges(&mut self) -> HashMap<usize, Vec<Range>> {
-    //     match &self.active_highlight_pattern {
-    //         Some(pattern) => self
-    //             .core
-    //             .find(&pattern, self.view_offset, Some(self.view_height)),
-    //         None => HashMap::new(),
-    //     }
-    // }
 
     pub fn print_error(&mut self, error: String) {
         self.status = StatusLine::Status(error);
@@ -242,25 +226,6 @@ fn make_span<'a>(span: sherlog_core::Span<'a>) -> tui::text::Span<'a> {
     }
 }
 
-// fn highlight<'a>(text: &'a str, highlights: Option<&Vec<Range>>) -> Vec<Span<'a>> {
-//     if let Some(ranges) = highlights {
-//         let mut v = Vec::new();
-//         let mut pos = 0;
-//         for range in ranges.iter() {
-//             v.push(Span::raw(&text[pos..range.start]));
-//             v.push(Span::styled(
-//                 &text[range.start..range.end],
-//                 Style::default().fg(Color::Red),
-//             ));
-//             pos = range.end;
-//         }
-//         v.push(Span::raw(&text[pos..]));
-//         v
-//     } else {
-//         vec![Span::raw(text)]
-//     }
-// }
-
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
         terminal.draw(|f| render_ui(f, &mut app))?;
@@ -285,8 +250,7 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // create app and run it
-    let height = terminal.size()?.height as usize;
-    let app = App::new(Sherlog::new(&test_data::SAMPLE_LOG), height);
+    let app = App::new(Sherlog::new(&test_data::SAMPLE_LOG));
     let res = run_app(&mut terminal, app);
 
     // restore terminal
