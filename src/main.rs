@@ -20,12 +20,13 @@ struct App {
     status: StatusLine,
     wants_quit: bool,
     view_height: usize,
-    active_highlight_pattern: Option<String>,
+    active_highlight_pattern: Option<Regex>,
 }
 
 enum SearchKind {
     Highlight,
     Search,
+    Filter,
 }
 
 impl Display for SearchKind {
@@ -33,6 +34,7 @@ impl Display for SearchKind {
         f.write_str(match self {
             SearchKind::Highlight => "highlight",
             SearchKind::Search => "search",
+            SearchKind::Filter => "filter",
         })
     }
 }
@@ -109,8 +111,32 @@ impl App {
         match &self.status {
             StatusLine::Command(command) => self.process_command(&command[1..].to_owned()),
             StatusLine::SearchPattern(SearchKind::Highlight, pattern) => {
-                self.active_highlight_pattern = Some(pattern.to_owned());
-                self.clear_status();
+                if pattern.trim().is_empty() {
+                    self.active_highlight_pattern = None;
+                    self.clear_status();
+                } else {
+                    match Regex::new(pattern) {
+                        Ok(re) => {
+                            self.active_highlight_pattern = Some(re);
+                            self.clear_status();
+                        }
+                        Err(e) => self.print_error(format!("Invalid pattern: {}", e)),
+                    }
+                }
+            }
+            StatusLine::SearchPattern(SearchKind::Filter, pattern) => {
+                if pattern.trim().is_empty() {
+                    self.core.remove_filter();
+                    self.clear_status();
+                } else {
+                    match Regex::new(pattern) {
+                        Ok(re) => {
+                            self.core.set_filter(re);
+                            self.clear_status();
+                        }
+                        Err(e) => self.print_error(format!("Invalid pattern: {}", e)),
+                    }
+                }
             }
             StatusLine::SearchPattern(SearchKind::Search, _) => {
                 todo!();
@@ -130,6 +156,9 @@ impl App {
             "h" | "highlight" => {
                 self.status = StatusLine::SearchPattern(SearchKind::Highlight, String::new())
             }
+            "f" | "filter" => {
+                self.status = StatusLine::SearchPattern(SearchKind::Filter, String::new())
+            }
             other => err = Some(format!("Unknown command: {}", other)),
         }
         if let Some(msg) = err {
@@ -137,18 +166,11 @@ impl App {
         }
     }
 
-    pub fn process_search(&mut self) -> HashMap<usize, Vec<FindRange>> {
+    pub fn get_highlight_ranges(&mut self) -> HashMap<usize, Vec<FindRange>> {
         match &self.active_highlight_pattern {
-            Some(pattern) => match Regex::new(&pattern) {
-                Ok(pattern) => self
-                    .core
-                    .find(&pattern, self.view_offset, Some(self.view_height)),
-                Err(e) => {
-                    self.print_error(format!("Invalid pattern: {}", e)); // FIXME: handle multiline errors properly
-                    self.active_highlight_pattern = None;
-                    HashMap::new()
-                }
-            },
+            Some(pattern) => self
+                .core
+                .find(&pattern, self.view_offset, Some(self.view_height)),
             None => HashMap::new(),
         }
     }
@@ -188,8 +210,7 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .constraints([layout::Constraint::Min(1), layout::Constraint::Length(1)].as_ref())
         .split(f.size());
 
-    // FIXME: highlights should not be triggered by / (this should be search)
-    let highlights = app.process_search();
+    let highlights = app.get_highlight_ranges();
 
     let lines = app
         .core

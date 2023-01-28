@@ -4,6 +4,7 @@ use regex::Regex;
 
 pub struct Sherlog {
     text_lines: Vec<String>,
+    filter: Option<Regex>,
 }
 
 pub struct FindRange {
@@ -15,6 +16,7 @@ impl Sherlog {
     pub fn new(text: &str) -> Self {
         Sherlog {
             text_lines: text.lines().map(String::from).collect(),
+            filter: None,
         }
     }
 
@@ -22,6 +24,12 @@ impl Sherlog {
         self.text_lines
             .iter()
             .skip(first)
+            .filter(|line| {
+                self.filter
+                    .as_ref()
+                    .map(|pat| pat.is_match(line))
+                    .unwrap_or(true)
+            })
             .take(cnt.unwrap_or(usize::MAX))
             .cloned()
             .collect()
@@ -55,5 +63,13 @@ impl Sherlog {
                 )
             })
             .collect()
+    }
+
+    pub fn set_filter(&mut self, filter: Regex) {
+        self.filter = Some(filter)
+    }
+
+    pub fn remove_filter(&mut self) {
+        self.filter = None
     }
 }
