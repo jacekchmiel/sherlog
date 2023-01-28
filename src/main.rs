@@ -74,13 +74,11 @@ impl App {
         match &mut self.status {
             StatusLine::Command(c) => c.push(input),
             StatusLine::SearchPattern(p) => p.push(input),
-            StatusLine::Status(_) if input == ':' => {
-                self.status = StatusLine::Command(String::from(input))
-            }
-            StatusLine::Status(_) if input == '/' => {
-                self.status = StatusLine::SearchPattern(String::from(input))
-            }
-            StatusLine::Status(_) => {}
+            StatusLine::Status(_) => match input {
+                ':' => self.status = StatusLine::Command(String::from(input)),
+                '/' => self.status = StatusLine::SearchPattern(String::from(input)),
+                _ => {}
+            },
         };
     }
 
@@ -104,6 +102,10 @@ impl App {
             }
             StatusLine::Status(_) => self.clear_status(),
         }
+    }
+
+    pub fn on_esc(&mut self) {
+        self.clear_status()
     }
 
     pub fn process_command(&mut self, command: &str) {
@@ -163,6 +165,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
                 KeyCode::Char(c) => app.on_user_input(c),
                 KeyCode::Backspace => app.on_backspace(),
                 KeyCode::Enter => app.on_enter(),
+                KeyCode::Esc => app.on_esc(),
                 _ => {}
             }
 
