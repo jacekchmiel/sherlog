@@ -13,7 +13,7 @@ plugin or full-blown standalone GUI.
 
  - [x] less-like interface with basic scrolling
  - [x] highlighting with regex
- - [ ] filtering with regex (single filter)
+ - [x] filtering with regex (single filter)
  - [ ] filtering with regex (multiple negative and positive filters)
    - [ ] active filter list with ability to add remove
    - [ ] disabling filters on the list (without removal to be able to enable

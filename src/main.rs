@@ -1,17 +1,16 @@
 mod sherlog_core;
 mod test_data;
 
-use std::collections::HashMap;
 use std::fmt::Display;
 
 use regex::Regex;
-use sherlog_core::{FindRange, Sherlog};
+use sherlog_core::{Sherlog, TextLine};
 
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::{execute, terminal, Result};
 use tui::backend::{Backend, CrosstermBackend};
 use tui::style::{Color, Style};
-use tui::text::{Span, Spans};
+use tui::text::Spans;
 use tui::{layout, widgets, Frame, Terminal};
 
 struct App {
@@ -20,7 +19,7 @@ struct App {
     status: StatusLine,
     wants_quit: bool,
     view_height: usize,
-    active_highlight_pattern: Option<Regex>,
+    filter_is_highlight: bool,
 }
 
 enum SearchKind {
@@ -69,7 +68,7 @@ impl App {
             status: StatusLine::Status(String::from("Type `:` to start command")),
             wants_quit: false,
             view_height: terminal_height - 1,
-            active_highlight_pattern: None,
+            filter_is_highlight: false,
         }
     }
 
@@ -112,12 +111,12 @@ impl App {
             StatusLine::Command(command) => self.process_command(&command[1..].to_owned()),
             StatusLine::SearchPattern(SearchKind::Highlight, pattern) => {
                 if pattern.trim().is_empty() {
-                    self.active_highlight_pattern = None;
+                    self.core.highlight = None;
                     self.clear_status();
                 } else {
                     match Regex::new(pattern) {
                         Ok(re) => {
-                            self.active_highlight_pattern = Some(re);
+                            self.core.highlight = Some(re);
                             self.clear_status();
                         }
                         Err(e) => self.print_error(format!("Invalid pattern: {}", e)),
@@ -126,12 +125,20 @@ impl App {
             }
             StatusLine::SearchPattern(SearchKind::Filter, pattern) => {
                 if pattern.trim().is_empty() {
-                    self.core.remove_filter();
+                    self.core.filter = None;
+                    if self.filter_is_highlight {
+                        self.filter_is_highlight = false;
+                        self.core.highlight = None;
+                    }
                     self.clear_status();
                 } else {
                     match Regex::new(pattern) {
                         Ok(re) => {
-                            self.core.set_filter(re);
+                            if self.core.highlight.is_none() {
+                                self.core.highlight = Some(re.clone());
+                                self.filter_is_highlight = true;
+                            }
+                            self.core.filter = Some(re);
                             self.clear_status();
                         }
                         Err(e) => self.print_error(format!("Invalid pattern: {}", e)),
@@ -166,14 +173,14 @@ impl App {
         }
     }
 
-    pub fn get_highlight_ranges(&mut self) -> HashMap<usize, Vec<FindRange>> {
-        match &self.active_highlight_pattern {
-            Some(pattern) => self
-                .core
-                .find(&pattern, self.view_offset, Some(self.view_height)),
-            None => HashMap::new(),
-        }
-    }
+    // pub fn get_highlight_ranges(&mut self) -> HashMap<usize, Vec<Range>> {
+    //     match &self.active_highlight_pattern {
+    //         Some(pattern) => self
+    //             .core
+    //             .find(&pattern, self.view_offset, Some(self.view_height)),
+    //         None => HashMap::new(),
+    //     }
+    // }
 
     pub fn print_error(&mut self, error: String) {
         self.status = StatusLine::Status(error);
@@ -210,16 +217,10 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .constraints([layout::Constraint::Min(1), layout::Constraint::Length(1)].as_ref())
         .split(f.size());
 
-    let highlights = app.get_highlight_ranges();
-
     let lines = app
         .core
         .get_lines(app.view_offset, Some(chunks[0].height as usize));
-    let spans: Vec<Spans<'_>> = lines
-        .iter()
-        .zip(app.view_offset..app.view_offset + app.view_height)
-        .map(|(text, line_num)| Spans::from(highlight(&text, highlights.get(&line_num))))
-        .collect();
+    let spans: Vec<Spans> = lines.into_iter().map(|line| make_spans(line)).collect();
     let paragraph = widgets::Paragraph::new(spans);
     f.render_widget(paragraph, chunks[0]);
 
@@ -227,24 +228,38 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(command_line, chunks[1]);
 }
 
-fn highlight<'a>(text: &'a str, highlights: Option<&Vec<FindRange>>) -> Vec<Span<'a>> {
-    if let Some(ranges) = highlights {
-        let mut v = Vec::new();
-        let mut pos = 0;
-        for range in ranges.iter() {
-            v.push(Span::raw(&text[pos..range.start]));
-            v.push(Span::styled(
-                &text[range.start..range.end],
-                Style::default().fg(Color::Red),
-            ));
-            pos = range.end;
+fn make_spans<'a>(line: TextLine<'a>) -> tui::text::Spans {
+    let vec: Vec<_> = line.spans.into_iter().map(|s| make_span(s)).collect();
+    vec.into()
+}
+
+fn make_span<'a>(span: sherlog_core::Span<'a>) -> tui::text::Span<'a> {
+    match span.kind {
+        sherlog_core::SpanKind::Raw => tui::text::Span::raw(span.content),
+        sherlog_core::SpanKind::Highlight => {
+            tui::text::Span::styled(span.content, Style::default().fg(Color::Red))
         }
-        v.push(Span::raw(&text[pos..]));
-        v
-    } else {
-        vec![Span::raw(text)]
     }
 }
+
+// fn highlight<'a>(text: &'a str, highlights: Option<&Vec<Range>>) -> Vec<Span<'a>> {
+//     if let Some(ranges) = highlights {
+//         let mut v = Vec::new();
+//         let mut pos = 0;
+//         for range in ranges.iter() {
+//             v.push(Span::raw(&text[pos..range.start]));
+//             v.push(Span::styled(
+//                 &text[range.start..range.end],
+//                 Style::default().fg(Color::Red),
+//             ));
+//             pos = range.end;
+//         }
+//         v.push(Span::raw(&text[pos..]));
+//         v
+//     } else {
+//         vec![Span::raw(text)]
+//     }
+// }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
