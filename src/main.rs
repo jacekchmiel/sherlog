@@ -150,33 +150,26 @@ impl App {
     }
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
-    loop {
-        terminal.draw(|f| ui(f, &mut app))?;
+fn handle_event(app: &mut App, event: Event) {
+    if let Event::Key(key) = event {
+        if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
+            app.wants_quit = true;
+            return;
+        }
 
-        if let Event::Key(key) = event::read()? {
-            if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
-                return Ok(());
-            }
-
-            match key.code {
-                KeyCode::Up => app.scroll_up(),
-                KeyCode::Down => app.scroll_down(),
-                KeyCode::Char(c) => app.on_user_input(c),
-                KeyCode::Backspace => app.on_backspace(),
-                KeyCode::Enter => app.on_enter(),
-                KeyCode::Esc => app.on_esc(),
-                _ => {}
-            }
-
-            if app.wants_quit {
-                return Ok(());
-            }
+        match key.code {
+            KeyCode::Up => app.scroll_up(),
+            KeyCode::Down => app.scroll_down(),
+            KeyCode::Char(c) => app.on_user_input(c),
+            KeyCode::Backspace => app.on_backspace(),
+            KeyCode::Enter => app.on_enter(),
+            KeyCode::Esc => app.on_esc(),
+            _ => {}
         }
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     // Create two chunks for text view and command bar
     let chunks = layout::Layout::default()
         .direction(layout::Direction::Vertical)
@@ -202,18 +195,32 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 }
 
 fn highlight<'a>(text: &'a str, highlights: Option<&Vec<FindRange>>) -> Vec<Span<'a>> {
-    //FIXME: handle multiple highlights
-    if let Some(range) = highlights.and_then(|h| h.first()) {
-        vec![
-            Span::raw(&text[..range.start]),
-            Span::styled(
+    if let Some(ranges) = highlights {
+        let mut v = Vec::new();
+        let mut pos = 0;
+        for range in ranges.iter() {
+            v.push(Span::raw(&text[pos..range.start]));
+            v.push(Span::styled(
                 &text[range.start..range.end],
                 Style::default().fg(Color::Red),
-            ),
-            Span::raw(&text[range.end..]),
-        ]
+            ));
+            pos = range.end;
+        }
+        v.push(Span::raw(&text[pos..]));
+        v
     } else {
         vec![Span::raw(text)]
+    }
+}
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
+    loop {
+        terminal.draw(|f| render_ui(f, &mut app))?;
+        handle_event(&mut app, event::read()?);
+
+        if app.wants_quit {
+            return Ok(());
+        }
     }
 }
 
