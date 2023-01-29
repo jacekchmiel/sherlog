@@ -1,11 +1,11 @@
 mod sherlog_core;
-mod test_data;
 
 use std::fmt::Display;
 
 use regex::Regex;
 use sherlog_core::{Sherlog, TextLine};
 
+use clap::Parser;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::{execute, terminal, Result};
 use tui::backend::{Backend, CrosstermBackend};
@@ -237,7 +237,20 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     }
 }
 
+/// Log investigator. Helps analyzing textual log files with rich (not yet) filtering options, search (not yet) and
+/// storing investigation session ready to resume after having a cup of coffee (also not yet implemented).
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Input file
+    #[arg(value_name = "LOG_FILE")]
+    input: String,
+}
+
 fn main() -> Result<()> {
+    let args = Args::parse();
+    let log_data = std::fs::read_to_string(args.input)?;
+
     // setup terminal
     terminal::enable_raw_mode()?;
     let mut stdout = std::io::stdout();
@@ -250,7 +263,7 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // create app and run it
-    let app = App::new(Sherlog::new(&test_data::SAMPLE_LOG));
+    let app = App::new(Sherlog::new(&log_data));
     let res = run_app(&mut terminal, app);
 
     // restore terminal
