@@ -9,3 +9,6 @@
 - [ ] search + navigation (next/previous)
 - [ ] printing search matches count and position
 - [ ] allow logging in the background
+- [x] add mouse scroll support
+- [x] faster mouse scrolling
+- [ ] print current line in status

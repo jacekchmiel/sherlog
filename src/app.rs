@@ -63,12 +63,12 @@ impl App {
         }
     }
 
-    pub fn scroll_up(&mut self) {
-        self.view_offset_y = self.view_offset_y.saturating_sub(1);
+    pub fn scroll_up(&mut self, line_cnt: usize) {
+        self.view_offset_y = self.view_offset_y.saturating_sub(line_cnt);
     }
 
-    pub fn scroll_down(&mut self) {
-        self.view_offset_y = self.view_offset_y.saturating_add(1);
+    pub fn scroll_down(&mut self, line_cnt: usize) {
+        self.view_offset_y = self.view_offset_y.saturating_add(line_cnt);
         let max_offset = self.core.line_count() - 1;
         if self.view_offset_y > max_offset {
             self.view_offset_y = max_offset;

@@ -13,23 +13,37 @@ use tui::text::Spans;
 use tui::{layout, widgets, Frame, Terminal};
 
 fn handle_event(app: &mut App, event: Event) {
-    if let Event::Key(key) = event {
-        if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
-            app.wants_quit = true;
-            return;
-        }
+    match event {
+        Event::Key(key) => {
+            if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
+                app.wants_quit = true;
+                return;
+            }
 
-        match key.code {
-            KeyCode::Up => app.scroll_up(),
-            KeyCode::Down => app.scroll_down(),
-            KeyCode::Left => app.scroll_left(),
-            KeyCode::Right => app.scroll_right(),
-            KeyCode::Char(c) => app.on_user_input(c),
-            KeyCode::Backspace => app.on_backspace(),
-            KeyCode::Enter => app.on_enter(),
-            KeyCode::Esc => app.on_esc(),
-            _ => {}
+            match key.code {
+                KeyCode::Up => app.scroll_up(1),
+                KeyCode::Down => app.scroll_down(1),
+                KeyCode::Left => app.scroll_left(),
+                KeyCode::Right => app.scroll_right(),
+                KeyCode::Char(c) => app.on_user_input(c),
+                KeyCode::Backspace => app.on_backspace(),
+                KeyCode::Enter => app.on_enter(),
+                KeyCode::Esc => app.on_esc(),
+                _ => {}
+            }
         }
+        Event::Mouse(mouse) => match mouse.kind {
+            event::MouseEventKind::ScrollDown if mouse.modifiers == KeyModifiers::CONTROL => {
+                app.scroll_down(10);
+            }
+            event::MouseEventKind::ScrollUp if mouse.modifiers == KeyModifiers::CONTROL => {
+                app.scroll_up(10);
+            }
+            event::MouseEventKind::ScrollDown => app.scroll_down(1),
+            event::MouseEventKind::ScrollUp => app.scroll_up(1),
+            _ => {}
+        },
+        _ => (),
     }
 }
 
