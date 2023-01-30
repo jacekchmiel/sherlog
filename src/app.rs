@@ -12,6 +12,7 @@ pub struct App {
     pub wants_quit: bool,
     pub filter_is_highlight: bool,
     pub wrap_lines: bool,
+    pub filename: String,
 }
 
 pub enum SearchKind {
@@ -51,7 +52,7 @@ impl Display for StatusLine {
 }
 
 impl App {
-    pub fn new(core: Sherlog) -> Self {
+    pub fn new(core: Sherlog, filename: String) -> Self {
         App {
             core,
             view_offset_y: 0,
@@ -60,6 +61,7 @@ impl App {
             wants_quit: false,
             filter_is_highlight: false,
             wrap_lines: false,
+            filename,
         }
     }
 

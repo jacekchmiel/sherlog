@@ -1,5 +1,8 @@
 mod app;
 mod sherlog_core;
+mod tui_widgets;
+
+use std::path::Path;
 
 use app::App;
 use sherlog_core::{Sherlog, TextLine};
@@ -67,8 +70,15 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     }
     f.render_widget(paragraph, chunks[0]);
 
-    let command_line = widgets::Paragraph::new(app.status.to_string());
-    f.render_widget(command_line, chunks[1]);
+    let bottom_line = tui_widgets::StatusLine::new()
+        .left(app.status.to_string())
+        .right(format!(
+            "{}/{}",
+            app.view_offset_y + 1,
+            app.core.line_count()
+        ))
+        .right(app.filename.as_ref());
+    f.render_widget(bottom_line, chunks[1]);
 }
 
 fn make_spans<'a>(line: TextLine<'a>, offset: usize) -> tui::text::Spans {
@@ -120,7 +130,11 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
-    let log_data = std::fs::read_to_string(args.input)?;
+    let log_data = std::fs::read_to_string(&args.input)?;
+    let filename = Path::new(&args.input)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or(String::from("invalid_filename"));
 
     // setup terminal
     terminal::enable_raw_mode()?;
@@ -134,7 +148,7 @@ fn main() -> Result<()> {
     let mut terminal = Terminal::new(backend)?;
 
     // main application loop
-    let app = App::new(Sherlog::new(&log_data));
+    let app = App::new(Sherlog::new(&log_data), filename);
     let res = run_app(&mut terminal, app);
 
     // restore terminal
