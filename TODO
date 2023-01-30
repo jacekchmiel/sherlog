@@ -1,0 +1,11 @@
+# Fixes and quick features shortlist
+
+- [x] toggle word wrap 
+- [x] horizontal movement with arrows
+- [ ] render cursor in command input mode
+- [ ] fix scrolling filtered text
+- [ ] rendering filtering list
+- [ ] applying multiple filters
+- [ ] search + navigation (next/previous)
+- [ ] printing search matches count and position
+- [ ] allow logging in the background
