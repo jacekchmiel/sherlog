@@ -15,7 +15,8 @@ use tui::{layout, widgets, Frame, Terminal};
 
 struct App {
     core: Sherlog,
-    view_offset: usize,
+    view_offset_y: usize,
+    view_offset_x: usize,
     status: StatusLine,
     wants_quit: bool,
     filter_is_highlight: bool,
@@ -61,7 +62,8 @@ impl App {
     pub fn new(core: Sherlog) -> Self {
         App {
             core,
-            view_offset: 0,
+            view_offset_y: 0,
+            view_offset_x: 0,
             status: StatusLine::Status(String::from("Type `:` to start command")),
             wants_quit: false,
             filter_is_highlight: false,
@@ -69,15 +71,23 @@ impl App {
     }
 
     pub fn scroll_up(&mut self) {
-        self.view_offset = self.view_offset.saturating_sub(1);
+        self.view_offset_y = self.view_offset_y.saturating_sub(1);
     }
 
     pub fn scroll_down(&mut self) {
-        self.view_offset = self.view_offset.saturating_add(1);
+        self.view_offset_y = self.view_offset_y.saturating_add(1);
         let max_offset = self.core.line_count() - 1;
-        if self.view_offset > max_offset {
-            self.view_offset = max_offset;
+        if self.view_offset_y > max_offset {
+            self.view_offset_y = max_offset;
         }
+    }
+
+    pub fn scroll_left(&mut self) {
+        self.view_offset_x = self.view_offset_x.saturating_sub(1);
+    }
+
+    pub fn scroll_right(&mut self) {
+        self.view_offset_x = self.view_offset_x.saturating_add(1);
     }
 
     pub fn on_user_input(&mut self, input: char) {
@@ -185,6 +195,8 @@ fn handle_event(app: &mut App, event: Event) {
         match key.code {
             KeyCode::Up => app.scroll_up(),
             KeyCode::Down => app.scroll_down(),
+            KeyCode::Left => app.scroll_left(),
+            KeyCode::Right => app.scroll_right(),
             KeyCode::Char(c) => app.on_user_input(c),
             KeyCode::Backspace => app.on_backspace(),
             KeyCode::Enter => app.on_enter(),
@@ -203,8 +215,11 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let lines = app
         .core
-        .get_lines(app.view_offset, Some(chunks[0].height as usize));
-    let spans: Vec<Spans> = lines.into_iter().map(|line| make_spans(line)).collect();
+        .get_lines(app.view_offset_y, Some(chunks[0].height as usize));
+    let spans: Vec<Spans> = lines
+        .into_iter()
+        .map(|line| make_spans(line, app.view_offset_x))
+        .collect();
     let paragraph = widgets::Paragraph::new(spans);
     f.render_widget(paragraph, chunks[0]);
 
@@ -212,9 +227,21 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(command_line, chunks[1]);
 }
 
-fn make_spans<'a>(line: TextLine<'a>) -> tui::text::Spans {
-    let vec: Vec<_> = line.spans.into_iter().map(|s| make_span(s)).collect();
-    vec.into()
+fn make_spans<'a>(line: TextLine<'a>, offset: usize) -> tui::text::Spans {
+    let mut chars_to_remove = offset;
+    let spans = line.spans.into_iter();
+    spans
+        .filter_map(|s| {
+            if chars_to_remove >= s.content.len() {
+                chars_to_remove -= s.content.len();
+                None
+            } else {
+                Some(s.remove_left(chars_to_remove))
+            }
+        })
+        .map(|s| make_span(s))
+        .collect::<Vec<_>>()
+        .into()
 }
 
 fn make_span<'a>(span: sherlog_core::Span<'a>) -> tui::text::Span<'a> {

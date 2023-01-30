@@ -6,6 +6,7 @@ pub struct Sherlog {
     pub highlight: Option<Regex>,
 }
 
+#[derive(Debug, Clone)]
 pub struct TextLine<'a> {
     pub spans: Vec<Span<'a>>,
 }
@@ -22,6 +23,7 @@ impl<'a> TextLine<'a> {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Span<'a> {
     pub content: &'a str,
     pub kind: SpanKind,
@@ -41,8 +43,16 @@ impl<'a> Span<'a> {
             kind: SpanKind::Highlight,
         }
     }
+
+    pub fn remove_left(&self, n: usize) -> Self {
+        Span {
+            content: &self.content[n..],
+            kind: self.kind,
+        }
+    }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum SpanKind {
     Raw,
     Highlight,
