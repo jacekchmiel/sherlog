@@ -3,7 +3,8 @@
 - [x] toggle word wrap 
 - [x] horizontal movement with arrows
 - [ ] render cursor in command input mode
-- [ ] fix scrolling filtered text
+- [ ] fix vertical scrolling filtered text
+- [ ] fix horizontal scrolling filtered text
 - [ ] rendering filtering list
 - [ ] applying multiple filters
 - [ ] search + navigation (next/previous)
@@ -11,4 +12,5 @@
 - [ ] allow logging in the background
 - [x] add mouse scroll support
 - [x] faster mouse scrolling
-- [ ] print current line in status
+- [x] print current line in status
+- [x] add home/end support

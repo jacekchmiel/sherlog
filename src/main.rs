@@ -32,6 +32,8 @@ fn handle_event(app: &mut App, event: Event) {
                 KeyCode::Backspace => app.on_backspace(),
                 KeyCode::Enter => app.on_enter(),
                 KeyCode::Esc => app.on_esc(),
+                KeyCode::Home => app.on_home(),
+                KeyCode::End => app.on_end(),
                 _ => {}
             }
         }

@@ -191,4 +191,12 @@ impl App {
     pub fn clear_status(&mut self) {
         self.status = StatusLine::with_empty();
     }
+
+    pub fn on_home(&mut self) {
+        self.view_offset_y = 0;
+    }
+
+    pub fn on_end(&mut self) {
+        self.view_offset_y = self.core.line_count() - 1;
+    }
 }
