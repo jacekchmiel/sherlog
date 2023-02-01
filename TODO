@@ -3,7 +3,7 @@
 - [x] toggle word wrap 
 - [x] horizontal movement with arrows
 - [ ] render cursor in command input mode
-- [ ] fix vertical scrolling filtered text
+- [x] fix vertical scrolling filtered text
 - [x] fix horizontal scrolling filtered text
 - [ ] rendering filtering list
 - [ ] applying multiple filters
@@ -14,3 +14,5 @@
 - [x] faster mouse scrolling
 - [x] print current line in status
 - [x] add home/end support
+- [ ] ease use of commands: trim whitespace, allow immediate value after whitespace
+- [ ] fix scrolling past last shown when filtered

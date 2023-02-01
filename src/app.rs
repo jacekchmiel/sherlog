@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use regex::Regex;
 
-use crate::sherlog_core::Sherlog;
+use crate::sherlog_core::{Sherlog, TextLine};
 
 pub struct App {
     pub core: Sherlog,

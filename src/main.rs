@@ -62,6 +62,7 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let lines = app
         .core
         .get_lines(app.view_offset_y, Some(chunks[0].height as usize));
+    let last_line_shown = lines.last().map(|l| l.line_num).unwrap_or_default();
     let spans: Vec<Spans> = lines
         .into_iter()
         .map(|line| make_spans(line, app.view_offset_x))
@@ -74,11 +75,7 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let bottom_line = tui_widgets::StatusLine::new()
         .left(app.status.to_string())
-        .right(format!(
-            "{}/{}",
-            app.view_offset_y + 1,
-            app.core.line_count()
-        ))
+        .right(format!("{}/{}", last_line_shown, app.core.line_count()))
         .right(app.filename.as_ref());
     f.render_widget(bottom_line, chunks[1]);
 }
