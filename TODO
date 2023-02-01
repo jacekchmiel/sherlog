@@ -4,7 +4,7 @@
 - [x] horizontal movement with arrows
 - [ ] render cursor in command input mode
 - [ ] fix vertical scrolling filtered text
-- [ ] fix horizontal scrolling filtered text
+- [x] fix horizontal scrolling filtered text
 - [ ] rendering filtering list
 - [ ] applying multiple filters
 - [ ] search + navigation (next/previous)

@@ -92,7 +92,9 @@ fn make_spans<'a>(line: TextLine<'a>, offset: usize) -> tui::text::Spans {
                 chars_to_remove -= s.content.len();
                 None
             } else {
-                Some(s.remove_left(chars_to_remove))
+                let remaining = s.remove_left(chars_to_remove);
+                chars_to_remove = 0;
+                Some(remaining)
             }
         })
         .map(|s| make_span(s))
