@@ -159,16 +159,19 @@ impl App {
     }
 
     pub fn process_command(&mut self, command: &str) {
+        let words: Vec<_> = command.split_whitespace().collect();
         let mut err: Option<String> = None;
-        match command {
-            "q" | "quit" => self.wants_quit = true,
-            "h" | "highlight" => {
-                self.status = StatusLine::SearchPattern(SearchKind::Highlight, String::new())
+        match &words[..] {
+            &["q" | "quit"] => self.wants_quit = true,
+            &["h" | "highlight", ref rest @ ..] => {
+                let value: String = rest.iter().copied().collect();
+                self.status = StatusLine::SearchPattern(SearchKind::Highlight, value)
             }
-            "f" | "filter" => {
-                self.status = StatusLine::SearchPattern(SearchKind::Filter, String::new())
+            &["f" | "filter", ref rest @ ..] => {
+                let value: String = rest.iter().copied().collect();
+                self.status = StatusLine::SearchPattern(SearchKind::Filter, value)
             }
-            "wrap" => {
+            &["w" | "wrap"] => {
                 if self.wrap_lines {
                     self.print_info("word wrap off");
                     self.wrap_lines = false;
@@ -177,7 +180,7 @@ impl App {
                     self.wrap_lines = true;
                 }
             }
-            other => err = Some(format!("Unknown command: {}", other)),
+            _ => err = Some(format!("Unknown command: {}", command)),
         }
         if let Some(msg) = err {
             self.print_error(msg);

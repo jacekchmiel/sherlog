@@ -14,5 +14,6 @@
 - [x] faster mouse scrolling
 - [x] print current line in status
 - [x] add home/end support
-- [ ] ease use of commands: trim whitespace, allow immediate value after whitespace
+- [x] ease use of commands: trim whitespace, allow immediate value after whitespace
 - [ ] fix scrolling past last shown when filtered
+- [ ] fix scrolling multiple lines when text is wrapped
