@@ -72,6 +72,7 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         paragraph = paragraph.wrap(widgets::Wrap { trim: false })
     }
     f.render_widget(paragraph, chunks[0]);
+    app.bottom_line_y = chunks[1].bottom();
 
     let bottom_line = tui_widgets::StatusLine::new()
         .left(app.status.to_string())
@@ -111,6 +112,12 @@ fn make_span<'a>(span: sherlog_core::Span<'a>) -> tui::text::Span<'a> {
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
         terminal.draw(|f| render_ui(f, &mut app))?;
+        if let Some((x, y)) = app.cursor() {
+            terminal.set_cursor(x, y)?;
+            terminal.show_cursor()?;
+        } else {
+            terminal.hide_cursor()?;
+        }
         handle_event(&mut app, event::read()?);
 
         if app.wants_quit {

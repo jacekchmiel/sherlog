@@ -13,6 +13,23 @@ pub struct App {
     pub filter_is_highlight: bool,
     pub wrap_lines: bool,
     pub filename: String,
+    pub bottom_line_y: u16,
+}
+
+impl App {
+    pub fn new(core: Sherlog, filename: String) -> Self {
+        App {
+            core,
+            view_offset_y: 0,
+            view_offset_x: 0,
+            status: StatusLine::Status(String::from("Type `:` to start command")),
+            wants_quit: false,
+            filter_is_highlight: false,
+            wrap_lines: false,
+            filename,
+            bottom_line_y: 0,
+        }
+    }
 }
 
 pub enum SearchKind {
@@ -52,19 +69,6 @@ impl Display for StatusLine {
 }
 
 impl App {
-    pub fn new(core: Sherlog, filename: String) -> Self {
-        App {
-            core,
-            view_offset_y: 0,
-            view_offset_x: 0,
-            status: StatusLine::Status(String::from("Type `:` to start command")),
-            wants_quit: false,
-            filter_is_highlight: false,
-            wrap_lines: false,
-            filename,
-        }
-    }
-
     pub fn scroll_up(&mut self, line_cnt: usize) {
         self.view_offset_y = self.view_offset_y.saturating_sub(line_cnt);
     }
@@ -198,5 +202,14 @@ impl App {
 
     pub fn on_end(&mut self) {
         self.view_offset_y = self.core.line_count() - 1;
+    }
+
+    pub fn cursor(&self) -> Option<(u16, u16)> {
+        match &self.status {
+            s @ (StatusLine::Command(_) | StatusLine::SearchPattern(_, _)) => {
+                Some((s.to_string().len() as u16, self.bottom_line_y))
+            }
+            StatusLine::Status(_) => None,
+        }
     }
 }

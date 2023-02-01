@@ -2,7 +2,7 @@
 
 - [x] toggle word wrap 
 - [x] horizontal movement with arrows
-- [ ] render cursor in command input mode
+- [x] render cursor in command input mode
 - [x] fix vertical scrolling filtered text
 - [x] fix horizontal scrolling filtered text
 - [ ] rendering filtering list
