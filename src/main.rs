@@ -14,6 +14,7 @@ use tui::backend::{Backend, CrosstermBackend};
 use tui::style::{Color, Style};
 use tui::text::Spans;
 use tui::{layout, widgets, Frame, Terminal};
+use tui_widgets::OverlayBlock;
 
 fn handle_event(app: &mut App, event: Event) {
     match event {
@@ -24,8 +25,8 @@ fn handle_event(app: &mut App, event: Event) {
             }
 
             match key.code {
-                KeyCode::Up => app.scroll_up(1),
-                KeyCode::Down => app.scroll_down(1),
+                KeyCode::Up => app.on_up(),
+                KeyCode::Down => app.on_down(),
                 KeyCode::Left => app.scroll_left(),
                 KeyCode::Right => app.scroll_right(),
                 KeyCode::Char(c) => app.on_user_input(c),
@@ -79,6 +80,34 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .right(format!("{}/{}", last_line_shown, app.core.line_count()))
         .right(app.filename.as_ref());
     f.render_widget(bottom_line, chunks[1]);
+
+    if app.showing_filter_list {
+        let overlay_area = layout::Layout::default()
+            .horizontal_margin(5)
+            .vertical_margin(1)
+            .direction(layout::Direction::Vertical)
+            .constraints([layout::Constraint::Min(0), layout::Constraint::Ratio(1, 2)])
+            .split(f.size())[1];
+
+        let mut list_state = widgets::ListState::default();
+        list_state.select(Some(app.selected_filter));
+        let overlayed_list = OverlayBlock::new(
+            //TODO: populate with real filters
+            //TODO: add/edit/delete/move support
+            //TODO: apply filters on close
+            widgets::List::new([
+                widgets::ListItem::new("Filter 1"),
+                widgets::ListItem::new("Filter 2"),
+                widgets::ListItem::new("Filter 3"),
+            ])
+            .highlight_style(Style::default().fg(Color::Yellow)),
+        )
+        .border(
+            widgets::BorderType::Double,
+            Style::default().fg(Color::Green),
+        );
+        f.render_stateful_widget(overlayed_list, overlay_area, &mut list_state);
+    }
 }
 
 fn make_spans<'a>(line: TextLine<'a>, offset: usize) -> tui::text::Spans {

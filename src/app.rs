@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use regex::Regex;
 
-use crate::sherlog_core::{Sherlog, TextLine};
+use crate::sherlog_core::Sherlog;
 
 pub struct App {
     pub core: Sherlog,
@@ -14,6 +14,9 @@ pub struct App {
     pub wrap_lines: bool,
     pub filename: String,
     pub bottom_line_y: u16,
+    pub filters: Vec<Filter>,
+    pub showing_filter_list: bool,
+    pub selected_filter: usize,
 }
 
 impl App {
@@ -28,8 +31,16 @@ impl App {
             wrap_lines: false,
             filename,
             bottom_line_y: 0,
+            filters: vec![Filter {}, Filter {}, Filter {}],
+            showing_filter_list: false,
+            selected_filter: 0,
         }
     }
+}
+
+pub struct Filter {
+    //     pub pattern: Regex,
+    //     pub negate: bool,
 }
 
 pub enum SearchKind {
@@ -69,8 +80,27 @@ impl Display for StatusLine {
 }
 
 impl App {
+    pub fn on_up(&mut self) {
+        if self.showing_filter_list {
+            self.selected_filter = self.selected_filter.saturating_sub(1)
+        } else {
+            self.scroll_up(1)
+        }
+    }
+
     pub fn scroll_up(&mut self, line_cnt: usize) {
         self.view_offset_y = self.view_offset_y.saturating_sub(line_cnt);
+    }
+
+    pub fn on_down(&mut self) {
+        if self.showing_filter_list {
+            self.selected_filter += 1;
+            if self.selected_filter > self.filters.len() {
+                self.selected_filter = self.filters.len();
+            }
+        } else {
+            self.scroll_down(1)
+        }
     }
 
     pub fn scroll_down(&mut self, line_cnt: usize) {
@@ -94,6 +124,9 @@ impl App {
             StatusLine::Command(c) => c.push(input),
             StatusLine::SearchPattern(_, p) => p.push(input),
             StatusLine::Status(_) => match input {
+                'f' => {
+                    self.showing_filter_list = true;
+                }
                 ':' => self.status = StatusLine::Command(String::from(input)),
                 _ => {}
             },
@@ -155,7 +188,11 @@ impl App {
     }
 
     pub fn on_esc(&mut self) {
-        self.clear_status()
+        if self.showing_filter_list {
+            self.showing_filter_list = false;
+        } else {
+            self.clear_status()
+        }
     }
 
     pub fn process_command(&mut self, command: &str) {

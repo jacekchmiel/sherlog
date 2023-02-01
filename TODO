@@ -17,3 +17,4 @@
 - [x] ease use of commands: trim whitespace, allow immediate value after whitespace
 - [ ] fix scrolling past last shown when filtered
 - [ ] fix scrolling multiple lines when text is wrapped
+- [ ] hierarchical app state and event/input processing
