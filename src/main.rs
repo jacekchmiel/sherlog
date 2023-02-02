@@ -5,48 +5,28 @@ mod tui_widgets;
 use std::path::Path;
 
 use app::App;
-use sherlog_core::{Sherlog, TextLine};
+use sherlog_core::Sherlog;
 
 use clap::Parser;
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{self, Event, KeyModifiers};
 use crossterm::{execute, terminal, Result};
 use tui::backend::{Backend, CrosstermBackend};
-use tui::style::{Color, Style};
-use tui::text::Spans;
-use tui::{layout, widgets, Frame, Terminal};
-use tui_widgets::OverlayBlock;
+use tui::{layout, Frame, Terminal};
 
 fn handle_event(app: &mut App, event: Event) {
     match event {
         Event::Key(key) => {
-            if key.code == KeyCode::Char('c') && key.modifiers == KeyModifiers::CONTROL {
-                app.wants_quit = true;
-                return;
-            }
-
-            match key.code {
-                KeyCode::Up => app.on_up(),
-                KeyCode::Down => app.on_down(),
-                KeyCode::Left => app.scroll_left(),
-                KeyCode::Right => app.scroll_right(),
-                KeyCode::Char(c) => app.on_user_input(c),
-                KeyCode::Backspace => app.on_backspace(),
-                KeyCode::Enter => app.on_enter(),
-                KeyCode::Esc => app.on_esc(),
-                KeyCode::Home => app.on_home(),
-                KeyCode::End => app.on_end(),
-                _ => {}
-            }
+            app.on_key(key);
         }
         Event::Mouse(mouse) => match mouse.kind {
             event::MouseEventKind::ScrollDown if mouse.modifiers == KeyModifiers::CONTROL => {
-                app.scroll_down(10);
+                app.view.scroll_down(10);
             }
             event::MouseEventKind::ScrollUp if mouse.modifiers == KeyModifiers::CONTROL => {
-                app.scroll_up(10);
+                app.view.scroll_up(10);
             }
-            event::MouseEventKind::ScrollDown => app.scroll_down(1),
-            event::MouseEventKind::ScrollUp => app.scroll_up(1),
+            event::MouseEventKind::ScrollDown => app.view.scroll_down(1),
+            event::MouseEventKind::ScrollUp => app.view.scroll_up(1),
             _ => {}
         },
         _ => (),
@@ -60,28 +40,17 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         .constraints([layout::Constraint::Min(1), layout::Constraint::Length(1)].as_ref())
         .split(f.size());
 
+    // TODO: line retrieval shouldn't be done in render...
     let lines = app
         .core
-        .get_lines(app.view_offset_y, Some(chunks[0].height as usize));
-    let last_line_shown = lines.last().map(|l| l.line_num).unwrap_or_default();
-    let spans: Vec<Spans> = lines
-        .into_iter()
-        .map(|line| make_spans(line, app.view_offset_x))
-        .collect();
-    let mut paragraph = widgets::Paragraph::new(spans);
-    if app.wrap_lines {
-        paragraph = paragraph.wrap(widgets::Wrap { trim: false })
-    }
-    f.render_widget(paragraph, chunks[0]);
-    app.bottom_line_y = chunks[1].bottom();
+        .get_lines(app.view.y, Some(chunks[0].height as usize));
+    let last_line_shown = lines.last().map(|l| l.line_num);
 
-    let bottom_line = tui_widgets::StatusLine::new()
-        .left(app.status.to_string())
-        .right(format!("{}/{}", last_line_shown, app.core.line_count()))
-        .right(app.filename.as_ref());
-    f.render_widget(bottom_line, chunks[1]);
+    f.render_widget(app.view.widget(lines), chunks[0]);
 
-    if app.showing_filter_list {
+    f.render_widget(app.status_line.widget(last_line_shown), chunks[1]);
+
+    if let Some((widget, mut state)) = app.filters.widget() {
         let overlay_area = layout::Layout::default()
             .horizontal_margin(5)
             .vertical_margin(1)
@@ -89,60 +58,19 @@ fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
             .constraints([layout::Constraint::Min(0), layout::Constraint::Ratio(1, 2)])
             .split(f.size())[1];
 
-        let mut list_state = widgets::ListState::default();
-        list_state.select(Some(app.selected_filter));
-        let overlayed_list = OverlayBlock::new(
-            //TODO: populate with real filters
-            //TODO: add/edit/delete/move support
-            //TODO: apply filters on close
-            widgets::List::new([
-                widgets::ListItem::new("Filter 1"),
-                widgets::ListItem::new("Filter 2"),
-                widgets::ListItem::new("Filter 3"),
-            ])
-            .highlight_style(Style::default().fg(Color::Yellow)),
-        )
-        .border(
-            widgets::BorderType::Double,
-            Style::default().fg(Color::Green),
-        );
-        f.render_stateful_widget(overlayed_list, overlay_area, &mut list_state);
+        f.render_stateful_widget(widget, overlay_area, &mut state);
     }
-}
 
-fn make_spans<'a>(line: TextLine<'a>, offset: usize) -> tui::text::Spans {
-    let mut chars_to_remove = offset;
-    let spans = line.spans.into_iter();
-    spans
-        .filter_map(|s| {
-            if chars_to_remove >= s.content.len() {
-                chars_to_remove -= s.content.len();
-                None
-            } else {
-                let remaining = s.remove_left(chars_to_remove);
-                chars_to_remove = 0;
-                Some(remaining)
-            }
-        })
-        .map(|s| make_span(s))
-        .collect::<Vec<_>>()
-        .into()
-}
-
-fn make_span<'a>(span: sherlog_core::Span<'a>) -> tui::text::Span<'a> {
-    match span.kind {
-        sherlog_core::SpanKind::Raw => tui::text::Span::raw(span.content),
-        sherlog_core::SpanKind::Highlight => {
-            tui::text::Span::styled(span.content, Style::default().fg(Color::Red))
-        }
+    if let Some(x) = app.status_line.cursor_x() {
+        f.set_cursor(x, chunks[1].y);
     }
 }
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
         terminal.draw(|f| render_ui(f, &mut app))?;
-        if let Some((x, y)) = app.cursor() {
-            terminal.set_cursor(x, y)?;
+        if let Some(_) = app.status_line.cursor_x() {
+            // terminal.set_cursor(x, y)?;
             terminal.show_cursor()?;
         } else {
             terminal.hide_cursor()?;

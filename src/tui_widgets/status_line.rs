@@ -21,9 +21,24 @@ impl<'a> StatusLine<'a> {
         self
     }
 
+    #[allow(dead_code)] // not used anywhere yet but as useful as right_maybe
+    pub fn left_maybe<T: Into<Text<'a>>>(self, text: Option<T>) -> Self {
+        match text {
+            Some(text) => self.left(text),
+            None => self,
+        }
+    }
+
     pub fn right<T: Into<Text<'a>>>(mut self, text: T) -> Self {
         self.right_aligned.push(text.into());
         self
+    }
+
+    pub fn right_maybe<T: Into<Text<'a>>>(self, text: Option<T>) -> Self {
+        match text {
+            Some(text) => self.right(text),
+            None => self,
+        }
     }
 }
 

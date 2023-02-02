@@ -1,46 +1,125 @@
 use std::fmt::Display;
 
+use crossterm::event::{KeyCode, KeyModifiers};
 use regex::Regex;
+use tui::style::{Color, Style};
+use tui::text::Spans;
+use tui::widgets::{BorderType, List, ListItem, ListState, Paragraph, Wrap};
 
-use crate::sherlog_core::Sherlog;
+use crate::sherlog_core::{self, Sherlog, TextLine};
+use crate::tui_widgets::{self, OverlayBlock};
 
 pub struct App {
     pub core: Sherlog,
-    pub view_offset_y: usize,
-    pub view_offset_x: usize,
-    pub status: StatusLine,
+
+    pub status_line: StatusLine,
+    pub filters: Filters,
+    pub view: ViewArea,
+
+    pub focus: Focus,
+
     pub wants_quit: bool,
     pub filter_is_highlight: bool,
-    pub wrap_lines: bool,
-    pub filename: String,
-    pub bottom_line_y: u16,
-    pub filters: Vec<Filter>,
-    pub showing_filter_list: bool,
-    pub selected_filter: usize,
 }
 
 impl App {
     pub fn new(core: Sherlog, filename: String) -> Self {
+        let line_count = core.line_count();
         App {
             core,
-            view_offset_y: 0,
-            view_offset_x: 0,
-            status: StatusLine::Status(String::from("Type `:` to start command")),
+
+            status_line: StatusLine {
+                content: StatusLineContent::Status(String::from("Type `:` to start command")),
+                filename,
+                last_line_shown: 0,
+                line_count,
+            },
+            filters: Filters {
+                entries: vec![
+                    String::from("Filter 1"),
+                    String::from("Filter 2"),
+                    String::from("Filter 3"),
+                ],
+                visible: false,
+                selected: 0,
+            },
+            view: ViewArea {
+                x: 0,
+                y: 0,
+                max_y: line_count - 1,
+                wrap: false,
+            },
+
+            focus: Focus::View,
+
             wants_quit: false,
             filter_is_highlight: false,
-            wrap_lines: false,
-            filename,
-            bottom_line_y: 0,
-            filters: vec![Filter {}, Filter {}, Filter {}],
-            showing_filter_list: false,
-            selected_filter: 0,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Focus {
+    View,
+    StatusLine,
+    Filters,
+}
+
+pub struct Filters {
+    pub entries: Vec<String>,
+    pub visible: bool,
+    pub selected: usize,
+}
+
+impl Filters {
+    pub fn select_next(&mut self) {
+        self.selected += 1;
+        if self.selected > self.entries.len() - 1 {
+            self.selected = self.entries.len() - 1;
+        }
+    }
+
+    pub fn select_prev(&mut self) {
+        self.selected = self.selected.saturating_sub(1);
+    }
+
+    pub fn widget(&self) -> Option<(OverlayBlock<List>, ListState)> {
+        if self.visible {
+            let mut list_state = ListState::default();
+            list_state.select(Some(self.selected));
+            let overlayed_list = OverlayBlock::new(
+                //TODO: populate with real filters
+                //TODO: add/edit/delete/move support
+                //TODO: apply filters on close
+                List::new(
+                    self.entries
+                        .iter()
+                        .map(|s| ListItem::new(s.as_ref()))
+                        .collect::<Vec<_>>(),
+                )
+                .highlight_style(Style::default().fg(Color::Yellow)),
+            )
+            .border(BorderType::Double, Style::default().fg(Color::Green));
+            Some((overlayed_list, list_state))
+        } else {
+            None
+        }
+    }
+
+    fn on_key(&mut self, key: crossterm::event::KeyEvent) {
+        match key.code {
+            KeyCode::Up => self.select_prev(),
+            KeyCode::Down => self.select_next(),
+            KeyCode::Esc => self.visible = false,
+            _ => {}
         }
     }
 }
 
 pub struct Filter {
-    //     pub pattern: Regex,
-    //     pub negate: bool,
+    pub value: Regex,
+    pub negate: bool,
+    pub active: bool,
 }
 
 pub enum SearchKind {
@@ -57,141 +136,260 @@ impl Display for SearchKind {
     }
 }
 
-pub enum StatusLine {
+pub struct StatusLine {
+    pub content: StatusLineContent,
+    pub filename: String,
+    pub last_line_shown: usize,
+    pub line_count: usize,
+}
+
+impl StatusLine {
+    pub fn cursor_x(&self) -> Option<u16> {
+        match &self.content {
+            s @ (StatusLineContent::Command(_) | StatusLineContent::SearchPattern(_, _)) => {
+                Some(s.to_string().len() as u16)
+            }
+            StatusLineContent::Status(_) => None,
+        }
+    }
+
+    pub fn print_error<S: Into<String>>(&mut self, error: S) {
+        self.content = StatusLineContent::Status(error.into());
+    }
+
+    pub fn print_info<S: Into<String>>(&mut self, info: S) {
+        self.content = StatusLineContent::Status(info.into());
+    }
+
+    pub fn clear(&mut self) {
+        self.content = StatusLineContent::with_empty();
+    }
+
+    pub fn widget(&self, last_line_shown: Option<usize>) -> tui_widgets::StatusLine {
+        tui_widgets::StatusLine::new()
+            .left(self.content.to_string())
+            .right_maybe(last_line_shown.map(|line| format!("{}/{}", line, self.line_count)))
+            .right(self.filename.as_ref())
+    }
+
+    fn on_key(&mut self, key: crossterm::event::KeyEvent) {
+        match (key.code, &mut self.content) {
+            (
+                KeyCode::Char(input),
+                StatusLineContent::Command(s) | StatusLineContent::SearchPattern(_, s),
+            ) => {
+                s.push(input);
+            }
+            (
+                KeyCode::Backspace,
+                StatusLineContent::Command(s) | StatusLineContent::SearchPattern(_, s),
+            ) => {
+                s.pop();
+            }
+            (KeyCode::Esc, _) => {
+                self.clear();
+            }
+            _ => {}
+        }
+    }
+}
+
+pub enum StatusLineContent {
     Command(String),
     SearchPattern(SearchKind, String), // header, pattern
     Status(String),
 }
 
-impl StatusLine {
+impl StatusLineContent {
     pub fn with_empty() -> Self {
-        StatusLine::Status(String::new())
+        StatusLineContent::Status(String::new())
     }
 }
 
-impl Display for StatusLine {
+impl Display for StatusLineContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StatusLine::Command(s) => f.write_str(s),
-            StatusLine::SearchPattern(h, s) => write!(f, "{} /{}", h, s),
-            StatusLine::Status(s) => f.write_str(s),
+            StatusLineContent::Command(s) => f.write_str(s),
+            StatusLineContent::SearchPattern(h, s) => write!(f, "{} /{}", h, s),
+            StatusLineContent::Status(s) => f.write_str(s),
+        }
+    }
+}
+
+pub struct ViewArea {
+    pub y: usize,
+    pub x: usize,
+    pub wrap: bool,
+    pub max_y: usize,
+}
+
+impl ViewArea {
+    pub fn scroll_up(&mut self, line_cnt: usize) {
+        self.y = self.y.saturating_sub(line_cnt);
+    }
+
+    pub fn scroll_down(&mut self, line_cnt: usize) {
+        self.y = self.y.saturating_add(line_cnt);
+        if self.y > self.max_y {
+            self.y = self.max_y;
+        }
+    }
+
+    pub fn scroll_left(&mut self) {
+        self.x = self.x.saturating_sub(1);
+    }
+
+    pub fn scroll_right(&mut self) {
+        self.x = self.x.saturating_add(1);
+    }
+
+    pub fn go_top(&mut self) {
+        self.y = 0;
+    }
+
+    pub fn go_bottom(&mut self) {
+        self.y = self.max_y;
+    }
+
+    pub fn widget<'a>(&self, lines: Vec<TextLine<'a>>) -> Paragraph<'a> {
+        let spans: Vec<Spans> = lines
+            .into_iter()
+            .map(|line| Self::make_spans(line, self.x))
+            .collect();
+        let mut paragraph = Paragraph::new(spans);
+        if self.wrap {
+            paragraph = paragraph.wrap(Wrap { trim: false })
+        }
+        paragraph
+    }
+
+    fn make_spans<'a>(line: TextLine<'a>, offset: usize) -> tui::text::Spans {
+        let mut chars_to_remove = offset;
+        let spans = line.spans.into_iter();
+        spans
+            .filter_map(|s| {
+                if chars_to_remove >= s.content.len() {
+                    chars_to_remove -= s.content.len();
+                    None
+                } else {
+                    let remaining = s.remove_left(chars_to_remove);
+                    chars_to_remove = 0;
+                    Some(remaining)
+                }
+            })
+            .map(|s| Self::make_span(s))
+            .collect::<Vec<_>>()
+            .into()
+    }
+
+    fn make_span<'a>(span: sherlog_core::Span<'a>) -> tui::text::Span<'a> {
+        match span.kind {
+            sherlog_core::SpanKind::Raw => tui::text::Span::raw(span.content),
+            sherlog_core::SpanKind::Highlight => {
+                tui::text::Span::styled(span.content, Style::default().fg(Color::Red))
+            }
+        }
+    }
+
+    fn on_key(&mut self, key: crossterm::event::KeyEvent) {
+        match key.code {
+            KeyCode::Up => self.scroll_up(1),
+            KeyCode::Down => self.scroll_down(1),
+            KeyCode::Left => self.scroll_left(),
+            KeyCode::Right => self.scroll_right(),
+            KeyCode::Home => self.go_top(),
+            KeyCode::End => self.go_bottom(),
+            _ => {}
         }
     }
 }
 
 impl App {
-    pub fn on_up(&mut self) {
-        if self.showing_filter_list {
-            self.selected_filter = self.selected_filter.saturating_sub(1)
-        } else {
-            self.scroll_up(1)
-        }
-    }
-
-    pub fn scroll_up(&mut self, line_cnt: usize) {
-        self.view_offset_y = self.view_offset_y.saturating_sub(line_cnt);
-    }
-
-    pub fn on_down(&mut self) {
-        if self.showing_filter_list {
-            self.selected_filter += 1;
-            if self.selected_filter > self.filters.len() {
-                self.selected_filter = self.filters.len();
+    pub fn on_key(&mut self, key: crossterm::event::KeyEvent) {
+        match key.code {
+            KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => {
+                self.wants_quit = true;
+                return;
             }
-        } else {
-            self.scroll_down(1)
-        }
-    }
-
-    pub fn scroll_down(&mut self, line_cnt: usize) {
-        self.view_offset_y = self.view_offset_y.saturating_add(line_cnt);
-        let max_offset = self.core.line_count() - 1;
-        if self.view_offset_y > max_offset {
-            self.view_offset_y = max_offset;
-        }
-    }
-
-    pub fn scroll_left(&mut self) {
-        self.view_offset_x = self.view_offset_x.saturating_sub(1);
-    }
-
-    pub fn scroll_right(&mut self) {
-        self.view_offset_x = self.view_offset_x.saturating_add(1);
-    }
-
-    pub fn on_user_input(&mut self, input: char) {
-        match &mut self.status {
-            StatusLine::Command(c) => c.push(input),
-            StatusLine::SearchPattern(_, p) => p.push(input),
-            StatusLine::Status(_) => match input {
-                'f' => {
-                    self.showing_filter_list = true;
+            KeyCode::Char(':') if self.focus == Focus::View => {
+                self.focus = Focus::StatusLine;
+                self.status_line.content = StatusLineContent::Command(String::from(':'));
+                return;
+            }
+            KeyCode::Char('f') if self.focus == Focus::View => {
+                self.focus = Focus::Filters;
+                self.filters.visible = true;
+                return;
+            }
+            KeyCode::Enter if self.focus == Focus::StatusLine => match &self.status_line.content {
+                StatusLineContent::Command(command) => {
+                    self.process_command(&command[1..].to_owned())
                 }
-                ':' => self.status = StatusLine::Command(String::from(input)),
-                _ => {}
+                StatusLineContent::SearchPattern(SearchKind::Highlight, pattern) => {
+                    let pattern = pattern.clone();
+                    self.highlight(&pattern);
+                    self.focus = Focus::View;
+                }
+                StatusLineContent::SearchPattern(SearchKind::Filter, pattern) => {
+                    let pattern = pattern.clone();
+                    self.filter(&pattern);
+                    self.focus = Focus::View;
+                }
+                StatusLineContent::Status(_) => {}
             },
-        };
-    }
+            _ => {}
+        }
 
-    pub fn on_backspace(&mut self) {
-        match &mut self.status {
-            StatusLine::Command(text) | StatusLine::SearchPattern(_, text) => {
-                text.pop();
-            }
-            StatusLine::Status(_) => {
-                self.status = StatusLine::with_empty();
-            }
+        match self.focus {
+            Focus::View => self.view.on_key(key),
+            Focus::StatusLine => self.status_line.on_key(key),
+            Focus::Filters => self.filters.on_key(key),
+        }
+
+        if key.code == KeyCode::Esc {
+            self.focus = Focus::View
         }
     }
 
-    pub fn on_enter(&mut self) {
-        match &self.status {
-            StatusLine::Command(command) => self.process_command(&command[1..].to_owned()),
-            StatusLine::SearchPattern(SearchKind::Highlight, pattern) => {
-                if pattern.trim().is_empty() {
-                    self.core.highlight = None;
-                    self.clear_status();
-                } else {
-                    match Regex::new(pattern) {
-                        Ok(re) => {
-                            self.core.highlight = Some(re);
-                            self.clear_status();
-                        }
-                        Err(e) => self.print_error(format!("Invalid pattern: {}", e)),
-                    }
-                }
-            }
-            StatusLine::SearchPattern(SearchKind::Filter, pattern) => {
-                if pattern.trim().is_empty() {
-                    self.core.filter = None;
-                    if self.filter_is_highlight {
-                        self.filter_is_highlight = false;
-                        self.core.highlight = None;
-                    }
-                    self.clear_status();
-                } else {
-                    match Regex::new(pattern) {
-                        Ok(re) => {
-                            if self.core.highlight.is_none() {
-                                self.core.highlight = Some(re.clone());
-                                self.filter_is_highlight = true;
-                            }
-                            self.core.filter = Some(re);
-                            self.clear_status();
-                        }
-                        Err(e) => self.print_error(format!("Invalid pattern: {}", e)),
-                    }
-                }
-            }
-            StatusLine::Status(_) => self.clear_status(),
-        }
-    }
-
-    pub fn on_esc(&mut self) {
-        if self.showing_filter_list {
-            self.showing_filter_list = false;
+    fn highlight(&mut self, pattern: &str) {
+        if pattern.trim().is_empty() {
+            self.core.highlight = None;
+            self.status_line.clear();
         } else {
-            self.clear_status()
+            match Regex::new(pattern) {
+                Ok(re) => {
+                    self.core.highlight = Some(re);
+                    self.status_line.clear();
+                }
+                Err(e) => self
+                    .status_line
+                    .print_error(format!("Invalid pattern: {}", e)),
+            }
+        }
+    }
+
+    fn filter(&mut self, pattern: &str) {
+        if pattern.trim().is_empty() {
+            self.core.filter = None;
+            if self.filter_is_highlight {
+                self.filter_is_highlight = false;
+                self.core.highlight = None;
+            }
+            self.status_line.clear();
+        } else {
+            match Regex::new(pattern) {
+                Ok(re) => {
+                    if self.core.highlight.is_none() {
+                        self.core.highlight = Some(re.clone());
+                        self.filter_is_highlight = true;
+                    }
+                    self.core.filter = Some(re);
+                    self.status_line.clear();
+                }
+                Err(e) => self
+                    .status_line
+                    .print_error(format!("Invalid pattern: {}", e)),
+            }
         }
     }
 
@@ -202,54 +400,27 @@ impl App {
             &["q" | "quit"] => self.wants_quit = true,
             &["h" | "highlight", ref rest @ ..] => {
                 let value: String = rest.iter().copied().collect();
-                self.status = StatusLine::SearchPattern(SearchKind::Highlight, value)
+                self.status_line.content =
+                    StatusLineContent::SearchPattern(SearchKind::Highlight, value)
             }
             &["f" | "filter", ref rest @ ..] => {
                 let value: String = rest.iter().copied().collect();
-                self.status = StatusLine::SearchPattern(SearchKind::Filter, value)
+                self.status_line.content =
+                    StatusLineContent::SearchPattern(SearchKind::Filter, value)
             }
             &["w" | "wrap"] => {
-                if self.wrap_lines {
-                    self.print_info("word wrap off");
-                    self.wrap_lines = false;
+                if self.view.wrap {
+                    self.status_line.print_info("word wrap off");
+                    self.view.wrap = false;
                 } else {
-                    self.print_info("word wrap on");
-                    self.wrap_lines = true;
+                    self.status_line.print_info("word wrap on");
+                    self.view.wrap = true;
                 }
             }
             _ => err = Some(format!("Unknown command: {}", command)),
         }
         if let Some(msg) = err {
-            self.print_error(msg);
-        }
-    }
-
-    pub fn print_error<S: Into<String>>(&mut self, error: S) {
-        self.status = StatusLine::Status(error.into());
-    }
-
-    pub fn print_info<S: Into<String>>(&mut self, info: S) {
-        self.status = StatusLine::Status(info.into());
-    }
-
-    pub fn clear_status(&mut self) {
-        self.status = StatusLine::with_empty();
-    }
-
-    pub fn on_home(&mut self) {
-        self.view_offset_y = 0;
-    }
-
-    pub fn on_end(&mut self) {
-        self.view_offset_y = self.core.line_count() - 1;
-    }
-
-    pub fn cursor(&self) -> Option<(u16, u16)> {
-        match &self.status {
-            s @ (StatusLine::Command(_) | StatusLine::SearchPattern(_, _)) => {
-                Some((s.to_string().len() as u16, self.bottom_line_y))
-            }
-            StatusLine::Status(_) => None,
+            self.status_line.print_error(msg);
         }
     }
 }
