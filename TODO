@@ -1,6 +1,6 @@
 # Fixes and quick features shortlist
 
-- [x] toggle word wrap 
+- [x] toggle word wrap
 - [x] horizontal movement with arrows
 - [x] render cursor in command input mode
 - [x] fix vertical scrolling filtered text
@@ -19,3 +19,4 @@
 - [ ] fix scrolling multiple lines when text is wrapped
 - [x] hierarchical app state and event/input processing
 - [ ] more performant text navigation - full log shouldn't be processed on every key stroke.
+- [ ] remove status/error prompt on :
