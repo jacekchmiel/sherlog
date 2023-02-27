@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use regex::Regex;
 use tui::backend::Backend;
@@ -28,11 +26,15 @@ pub struct App {
 
     pub y: usize,
     pub max_y: usize,
+    pub status_line_y: u16,
+    pub terminal_size: Rect,
+    pub filter_overlay: Option<Rect>,
 }
 
 impl App {
-    pub fn new(core: Sherlog, filename: String, height: u16) -> Self {
+    pub fn new(core: Sherlog, filename: String, terminal_size: Rect) -> Self {
         let line_count = core.line_count();
+        let layout = Self::layout(terminal_size);
 
         let mut app = App {
             core,
@@ -44,16 +46,16 @@ impl App {
             },
             filter_list: FilterList {
                 entries: vec![
-                    Filter::from_str("Filter 1").unwrap(),
-                    Filter::from_str("Filter 2").unwrap(),
-                    Filter::from_str("Filter 3").unwrap(),
+                    Filter::new("Filter 1"),
+                    Filter::new("Filter 2"),
+                    Filter::new("Filter 3"),
                 ],
-                visible: false,
                 selected: 0,
+                edit_cursor: None,
             },
             text_area: TextArea {
                 x: 0,
-                height,
+                height: layout[0].height,
                 wrap: false,
                 lines: vec![],
             },
@@ -65,6 +67,9 @@ impl App {
 
             y: 0,
             max_y: line_count - 1,
+            status_line_y: layout[1].y,
+            terminal_size,
+            filter_overlay: None,
         };
         app.update_presented_lines();
         app
@@ -83,7 +88,8 @@ impl App {
             }
             KeyCode::Char('f') if self.focus == Focus::General => {
                 self.focus = Focus::Filters;
-                self.filter_list.visible = true;
+                self.filter_overlay = Some(self.make_filter_overlay());
+                self.status_line.clear();
                 return;
             }
             KeyCode::Enter if self.focus == Focus::StatusLine => match &self.status_line.content {
@@ -102,17 +108,21 @@ impl App {
                 }
                 StatusLineContent::Status(_) => {}
             },
+            KeyCode::Esc
+                if self.filter_list.edit_cursor.is_none()
+                    && self.status_line.content.is_empty() =>
+            {
+                self.focus = Focus::General;
+                self.filter_overlay = None;
+            }
             _ => {}
         }
 
+        // FIXME: should move top and return if event was consumed? Would avoid conditions like in esc above.
         match self.focus {
             Focus::General => self.on_key_no_focus(key),
             Focus::StatusLine => self.status_line.on_key(key),
             Focus::Filters => self.filter_list.on_key(key),
-        }
-
-        if key.code == KeyCode::Esc {
-            self.focus = Focus::General
         }
     }
 
@@ -130,7 +140,8 @@ impl App {
     }
 
     fn on_resize(&mut self, x: u16, y: u16) {
-        let chunks = self.layout(Rect::new(0, 0, x, y));
+        self.terminal_size = Rect::new(0, 0, x, y);
+        let chunks = Self::layout(self.terminal_size);
         let new_height = chunks[0].height;
         if self.text_area.height != new_height {
             self.text_area.height = new_height;
@@ -145,6 +156,15 @@ impl App {
             .iter()
             .map(TextLineRef::to_text_line)
             .collect();
+    }
+
+    fn make_filter_overlay(&self) -> Rect {
+        layout::Layout::default()
+            .horizontal_margin(5)
+            .vertical_margin(1)
+            .direction(layout::Direction::Vertical)
+            .constraints([layout::Constraint::Min(0), layout::Constraint::Ratio(1, 2)])
+            .split(self.terminal_size)[1]
     }
 
     fn last_line_shown(&self) -> Option<usize> {
@@ -251,33 +271,41 @@ impl App {
         }
     }
 
-    fn layout(&self, area: Rect) -> Vec<Rect> {
+    fn layout(area: Rect) -> Vec<Rect> {
         // Create two chunks for text view and command bar
         layout::Layout::default()
             .direction(layout::Direction::Vertical)
             .constraints([layout::Constraint::Min(1), layout::Constraint::Length(1)].as_ref())
             .split(area)
     }
+
+    pub fn cursor(&self) -> Option<(u16, u16)> {
+        if let Some(x) = self.status_line.cursor_x() {
+            Some((x, self.status_line_y))
+        } else {
+            self.filter_list
+                .edit_cursor
+                .zip(self.filter_overlay)
+                .map(|((x, y), overlay)| (overlay.x + x, overlay.y + y))
+                // FIXME: To remove this ugly hack, we should move determining cursor position
+                // somewhere around render_ui where actual widgets are created
+                .map(|(x, y)| (x + 1, y + 1))
+        }
+    }
 }
 
 pub fn render_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-    let chunks = app.layout(f.size());
+    let chunks = App::layout(f.size());
     f.render_widget(app.text_area.widget(), chunks[0]);
     f.render_widget(app.status_line.widget(app.last_line_shown()), chunks[1]);
 
-    if let Some((widget, mut state)) = app.filter_list.widget() {
-        let overlay_area = layout::Layout::default()
-            .horizontal_margin(5)
-            .vertical_margin(1)
-            .direction(layout::Direction::Vertical)
-            .constraints([layout::Constraint::Min(0), layout::Constraint::Ratio(1, 2)])
-            .split(f.size())[1];
-
+    if let Some(overlay_area) = app.filter_overlay {
+        let (widget, mut state) = app.filter_list.widget();
         f.render_stateful_widget(widget, overlay_area, &mut state);
     }
 
-    if let Some(x) = app.status_line.cursor_x() {
-        f.set_cursor(x, chunks[1].y);
+    if let Some((x, y)) = app.cursor() {
+        f.set_cursor(x, y);
     }
 }
 

@@ -20,3 +20,4 @@
 - [x] hierarchical app state and event/input processing
 - [ ] more performant text navigation - full log shouldn't be processed on every key stroke.
 - [ ] remove status/error prompt on :
+- [ ] exit filter view on :

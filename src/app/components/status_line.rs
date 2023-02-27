@@ -85,6 +85,14 @@ impl StatusLineContent {
     pub fn with_empty() -> Self {
         StatusLineContent::Status(String::new())
     }
+
+    pub fn is_empty(&self) -> bool {
+        if let StatusLineContent::Status(s) = self {
+            return s.is_empty();
+        } else {
+            false
+        }
+    }
 }
 
 impl Display for StatusLineContent {

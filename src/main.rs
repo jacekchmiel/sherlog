@@ -16,7 +16,7 @@ use tui::Terminal;
 fn run_app<B: Backend + std::io::Write>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
         terminal.draw(|f| render_ui(f, &mut app))?;
-        if let Some(_) = app.status_line.cursor_x() {
+        if let Some(_) = app.cursor() {
             terminal.show_cursor()?;
         } else {
             terminal.hide_cursor()?;
@@ -39,6 +39,16 @@ struct Args {
     input: String,
 }
 
+fn restore_terminal() -> Result<()> {
+    terminal::disable_raw_mode()?;
+    crossterm::execute!(
+        std::io::stdout(),
+        event::DisableMouseCapture,
+        terminal::LeaveAlternateScreen,
+    )?;
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
     let log_data = std::fs::read_to_string(&args.input)?;
@@ -58,18 +68,18 @@ fn main() -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
+    // Register panic hook
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        restore_terminal().unwrap();
+        original_hook(panic);
+    }));
+
     // main application loop
-    let app = App::new(Sherlog::new(&log_data), filename, terminal.size()?.height);
+    let app = App::new(Sherlog::new(&log_data), filename, terminal.size()?);
     let res = run_app(&mut terminal, app);
 
-    // restore terminal
-    terminal::disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        terminal::LeaveAlternateScreen,
-        event::DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+    restore_terminal()?;
 
     if let Err(err) = res {
         println!("{:?}", err)
