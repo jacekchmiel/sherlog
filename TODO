@@ -5,8 +5,8 @@
 - [x] render cursor in command input mode
 - [x] fix vertical scrolling filtered text
 - [x] fix horizontal scrolling filtered text
-- [ ] rendering filtering list
-- [ ] applying multiple filters
+- [x] rendering filtering list
+- [x] applying multiple filters
 - [ ] search + navigation (next/previous)
 - [ ] printing search matches count and position
 - [ ] allow logging in the background
@@ -20,4 +20,8 @@
 - [x] hierarchical app state and event/input processing
 - [ ] more performant text navigation - full log shouldn't be processed on every key stroke.
 - [ ] remove status/error prompt on :
-- [ ] exit filter view on :
+- [ ] allow commands (:) with filter view
+- [ ] send event description to status line/log on user actions (e.g. Filter disabled, filter negated etc)
+- [ ] placeholder text for empty filter list (press a to add new filter...)
+- [ ] Fix filter list cursor y coordinate for more filters than overlay can fit
+- [ ] Print active filters on status line

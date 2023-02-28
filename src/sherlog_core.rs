@@ -1,8 +1,20 @@
 use regex::Regex;
 
+#[derive(Clone, Debug)]
+pub struct RegexFilter {
+    pub pattern: Regex,
+    pub negate: bool,
+}
+
+impl RegexFilter {
+    pub fn is_match(&self, line: &str) -> bool {
+        self.pattern.is_match(line) ^ self.negate
+    }
+}
+
 pub struct Sherlog {
     lines: Vec<String>,
-    pub filter: Option<Regex>,
+    pub filters: Vec<RegexFilter>,
     pub highlight: Option<Regex>,
 }
 
@@ -10,7 +22,7 @@ impl Sherlog {
     pub fn new(text: &str) -> Self {
         Sherlog {
             lines: text.lines().map(String::from).collect(),
-            filter: None,
+            filters: Vec::new(),
             highlight: None,
         }
     }
@@ -20,12 +32,7 @@ impl Sherlog {
             .lines
             .iter()
             .enumerate()
-            .filter(|(_, line)| {
-                self.filter
-                    .as_ref()
-                    .map(|pat| pat.is_match(line))
-                    .unwrap_or(true)
-            })
+            .filter(|(_, line)| self.filters.iter().all(|pat| pat.is_match(line)))
             .skip(first)
             .take(cnt.unwrap_or(usize::MAX))
             .collect();

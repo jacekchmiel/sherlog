@@ -6,7 +6,7 @@ use tui::{layout, Frame};
 
 use crate::sherlog_core::{Sherlog, TextLineRef};
 
-use self::components::filters::{Filter, FilterList};
+use self::components::filters::{FilterEntry, FilterList};
 use self::components::status_line::{SearchKind, StatusLine, StatusLineContent};
 use self::components::text_area::TextArea;
 
@@ -29,6 +29,7 @@ pub struct App {
     pub status_line_y: u16,
     pub terminal_size: Rect,
     pub filter_overlay: Option<Rect>,
+    pub commandline_filter: Option<FilterEntry>,
 }
 
 impl App {
@@ -44,15 +45,7 @@ impl App {
                 filename,
                 line_count,
             },
-            filter_list: FilterList {
-                entries: vec![
-                    Filter::new("Filter 1"),
-                    Filter::new("Filter 2"),
-                    Filter::new("Filter 3"),
-                ],
-                selected: 0,
-                edit_cursor: None,
-            },
+            filter_list: Default::default(),
             text_area: TextArea {
                 x: 0,
                 height: layout[0].height,
@@ -70,6 +63,7 @@ impl App {
             status_line_y: layout[1].y,
             terminal_size,
             filter_overlay: None,
+            commandline_filter: None,
         };
         app.update_presented_lines();
         app
@@ -109,11 +103,17 @@ impl App {
                 StatusLineContent::Status(_) => {}
             },
             KeyCode::Esc
-                if self.filter_list.edit_cursor.is_none()
-                    && self.status_line.content.is_empty() =>
+                if !self.filter_list.is_editing() && self.status_line.content.is_empty() =>
             {
                 self.focus = Focus::General;
                 self.filter_overlay = None;
+                self.core.filters = self.filter_list.make_regex_filter_vec();
+                self.core.filters.extend(
+                    self.commandline_filter
+                        .as_ref()
+                        .and_then(FilterEntry::try_to_regex_filter)
+                        .into_iter(),
+                );
             }
             _ => {}
         }
@@ -217,7 +217,7 @@ impl App {
 
     fn filter(&mut self, pattern: &str) {
         if pattern.trim().is_empty() {
-            self.core.filter = None;
+            self.commandline_filter = None;
             if self.filter_is_highlight {
                 self.filter_is_highlight = false;
                 self.core.highlight = None;
@@ -230,7 +230,13 @@ impl App {
                         self.core.highlight = Some(re.clone());
                         self.filter_is_highlight = true;
                     }
-                    self.core.filter = Some(re);
+                    self.core.filters = self.filter_list.make_regex_filter_vec();
+                    self.core.filters.extend(
+                        self.commandline_filter
+                            .as_ref()
+                            .and_then(FilterEntry::try_to_regex_filter)
+                            .into_iter(),
+                    );
                     self.status_line.clear();
                 }
                 Err(e) => self
@@ -284,7 +290,7 @@ impl App {
             Some((x, self.status_line_y))
         } else {
             self.filter_list
-                .edit_cursor
+                .cursor()
                 .zip(self.filter_overlay)
                 .map(|((x, y), overlay)| (overlay.x + x, overlay.y + y))
                 // FIXME: To remove this ugly hack, we should move determining cursor position
