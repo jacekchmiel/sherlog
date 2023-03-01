@@ -3,9 +3,12 @@ use tui::layout::Rect;
 use tui::text::Text;
 use tui::widgets::Widget;
 
+use crate::sherlog_tui_app::{Cursor, RenderCursor};
+
 pub struct StatusLine<'a> {
     left_aligned: Vec<Text<'a>>,
     right_aligned: Vec<Text<'a>>,
+    cursor: Option<u16>,
 }
 
 impl<'a> StatusLine<'a> {
@@ -13,6 +16,7 @@ impl<'a> StatusLine<'a> {
         StatusLine {
             left_aligned: Default::default(),
             right_aligned: Default::default(),
+            cursor: None,
         }
     }
 
@@ -40,6 +44,14 @@ impl<'a> StatusLine<'a> {
             None => self,
         }
     }
+
+    // TODO: cursor should be connected to particular field
+    // That way adding additional field to the left before "editable"
+    // one would be handled automatically by this widget
+    pub fn with_cursor_maybe(mut self, x: Option<u16>) -> Self {
+        self.cursor = x;
+        self
+    }
 }
 
 impl<'a> Widget for StatusLine<'a> {
@@ -66,6 +78,12 @@ impl<'a> Widget for StatusLine<'a> {
             render_field(item, a, buf);
             cur += a.width + 1;
         }
+    }
+}
+
+impl RenderCursor for StatusLine<'_> {
+    fn cursor(&self, area: Rect) -> Option<Cursor> {
+        self.cursor.map(|x| Cursor::new(x, 0).inside(area))
     }
 }
 

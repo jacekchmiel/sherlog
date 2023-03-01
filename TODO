@@ -1,5 +1,6 @@
 # Fixes and quick features shortlist
 
+- [ ] Esc cancels filter changes, both single line and whole view
 - [x] toggle word wrap
 - [x] horizontal movement with arrows
 - [x] render cursor in command input mode

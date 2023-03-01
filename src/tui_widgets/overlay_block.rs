@@ -2,6 +2,8 @@ use tui::layout::Rect;
 use tui::style::Style;
 use tui::widgets::{Block, BorderType, Borders, StatefulWidget, Widget};
 
+use crate::sherlog_tui_app::{Cursor, RenderCursor};
+
 pub struct OverlayBlock<T> {
     inner: T,
     border: Option<(BorderType, Style)>,
@@ -22,19 +24,20 @@ impl<T> OverlayBlock<T> {
         }
     }
 
-    fn render_base(&self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) -> Rect {
-        let content_area = if let Some((border_type, border_style)) = self.border {
-            let block = Block::default()
+    fn block(&self) -> Block {
+        match self.border {
+            Some((border_type, border_style)) => Block::default()
                 .border_type(border_type)
                 .border_style(border_style)
-                .borders(Borders::all());
-            let content_area = block.inner(area);
-            block.render(area, buf);
+                .borders(Borders::all()),
+            None => Block::default().borders(Borders::NONE),
+        }
+    }
 
-            content_area
-        } else {
-            area
-        };
+    fn render_base(&self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) -> Rect {
+        let block = self.block();
+        let content_area = block.inner(area);
+        block.render(area, buf);
 
         // clear content area to mimic overlay
         for x in content_area.left()..content_area.right() {
@@ -65,5 +68,12 @@ impl<T: StatefulWidget> StatefulWidget for OverlayBlock<T> {
     ) {
         let content_area = self.render_base(area, buf);
         self.inner.render(content_area, buf, state);
+    }
+}
+
+impl<T: RenderCursor> RenderCursor for OverlayBlock<T> {
+    fn cursor(&self, area: Rect) -> Option<Cursor> {
+        let content_area = self.block().inner(area);
+        self.inner.cursor(content_area)
     }
 }

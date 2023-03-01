@@ -1,0 +1,117 @@
+use tui::style::{Color, Style};
+use tui::text::Spans;
+use tui::widgets::{Paragraph, Wrap};
+
+use crate::sherlog_core::{self, TextLine};
+use crate::sherlog_tui_app::Render;
+
+pub(crate) struct TextArea {
+    pub x: usize,
+    pub y: usize,
+    pub max_y: usize,
+    pub height: u16, // Shouldn't we get this as render feedback?
+    pub wrap: bool,
+    pub lines: Vec<TextLine>,
+}
+
+impl TextArea {
+    pub fn new(height: u16, max_y: usize) -> Self {
+        TextArea {
+            x: 0,
+            y: 0,
+            max_y,
+            height,
+            wrap: false,
+            lines: vec![],
+        }
+    }
+
+    pub fn scroll_up(&mut self, line_cnt: usize) -> bool {
+        let old_y = self.y;
+        self.y = self.y.saturating_sub(line_cnt);
+        old_y != self.y
+    }
+
+    pub fn scroll_down(&mut self, line_cnt: usize) -> bool {
+        let old_y = self.y;
+        self.y = self.y.saturating_add(line_cnt);
+        if self.y > self.max_y {
+            self.y = self.max_y;
+        }
+        old_y != self.y
+    }
+
+    pub fn scroll_left(&mut self) -> bool {
+        let old_x = self.x;
+        self.x = self.x.saturating_sub(1);
+        old_x != self.x
+    }
+
+    pub fn scroll_right(&mut self) -> bool {
+        let old_x = self.x;
+        self.x = self.x.saturating_add(1);
+        old_x != self.x
+    }
+
+    pub fn go_top(&mut self) -> bool {
+        let old_y = self.y;
+        self.y = 0;
+        old_y != self.y
+    }
+
+    pub fn go_bottom(&mut self) -> bool {
+        let old_y = self.y;
+        self.y = self.max_y;
+        old_y != self.y
+    }
+
+    fn make_spans<'a>(line: &'a TextLine, offset: usize) -> tui::text::Spans<'a> {
+        let mut chars_to_remove = offset;
+        let spans = line.spans.iter();
+        spans
+            .filter_map(|s| {
+                if chars_to_remove >= s.content.len() {
+                    chars_to_remove -= s.content.len();
+                    None
+                } else {
+                    let remaining = s.remove_left(chars_to_remove);
+                    chars_to_remove = 0;
+                    Some(remaining)
+                }
+            })
+            .map(|s| Self::make_span(s))
+            .collect::<Vec<_>>()
+            .into()
+    }
+
+    fn make_span<'a>(span: sherlog_core::SpanRef<'a>) -> tui::text::Span<'a> {
+        match span.kind {
+            sherlog_core::SpanKind::Raw => tui::text::Span::raw(span.content),
+            sherlog_core::SpanKind::Highlight => {
+                tui::text::Span::styled(span.content, Style::default().fg(Color::Red))
+            }
+        }
+    }
+
+    pub fn toggle_wrap(&mut self) -> bool {
+        self.wrap = !self.wrap;
+        self.wrap
+    }
+}
+
+impl<'a> Render<'a> for TextArea {
+    type Widget = Paragraph<'a>;
+
+    fn widget(&'a self) -> Paragraph<'a> {
+        let spans: Vec<Spans> = self
+            .lines
+            .iter()
+            .map(|line| Self::make_spans(line, self.x))
+            .collect();
+        let mut paragraph = Paragraph::new(spans);
+        if self.wrap {
+            paragraph = paragraph.wrap(Wrap { trim: false })
+        }
+        paragraph
+    }
+}

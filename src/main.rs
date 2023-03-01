@@ -1,11 +1,11 @@
-mod app;
 mod sherlog_core;
+mod sherlog_tui_app;
 mod tui_widgets;
 
 use std::path::Path;
 
-use app::{handle_event, render_ui, App};
 use sherlog_core::Sherlog;
+use sherlog_tui_app::app::{handle_event, render_app, App};
 
 use clap::Parser;
 use crossterm::event;
@@ -15,14 +15,8 @@ use tui::Terminal;
 
 fn run_app<B: Backend + std::io::Write>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
-        terminal.draw(|f| render_ui(f, &mut app))?;
-        if let Some(_) = app.cursor() {
-            terminal.show_cursor()?;
-        } else {
-            terminal.hide_cursor()?;
-        }
+        terminal.draw(|f| render_app(&mut app, f))?;
         handle_event(&mut app, event::read()?);
-
         if app.wants_quit {
             return Ok(());
         }
