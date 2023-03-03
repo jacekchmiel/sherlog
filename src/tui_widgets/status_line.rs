@@ -8,7 +8,7 @@ use crate::sherlog_tui_app::{Cursor, RenderCursor};
 pub struct StatusLine<'a> {
     left_aligned: Vec<Text<'a>>,
     right_aligned: Vec<Text<'a>>,
-    cursor: Option<u16>,
+    cursor: Option<usize>,
 }
 
 impl<'a> StatusLine<'a> {
@@ -45,11 +45,13 @@ impl<'a> StatusLine<'a> {
         }
     }
 
-    // TODO: cursor should be connected to particular field
-    // That way adding additional field to the left before "editable"
-    // one would be handled automatically by this widget
-    pub fn with_cursor_maybe(mut self, x: Option<u16>) -> Self {
-        self.cursor = x;
+    /// Inserts cursor after last left field if show_cursor is true
+    pub fn cursor_maybe(mut self, show_cursor: bool) -> Self {
+        if show_cursor {
+            self.cursor = Some(self.left_aligned.len());
+        } else {
+            self.cursor = None;
+        }
         self
     }
 }
@@ -83,7 +85,16 @@ impl<'a> Widget for StatusLine<'a> {
 
 impl RenderCursor for StatusLine<'_> {
     fn cursor(&self, area: Rect) -> Option<Cursor> {
-        self.cursor.map(|x| Cursor::new(x, 0).inside(area))
+        self.cursor.map(|left_cnt| {
+            let mut x = self
+                .left_aligned
+                .iter()
+                .take(left_cnt)
+                .map(Text::width)
+                .sum::<usize>() as u16;
+            x += left_cnt.saturating_sub(1) as u16;
+            Cursor::new(x, 0).inside(area)
+        })
     }
 }
 

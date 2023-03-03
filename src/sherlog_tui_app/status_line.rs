@@ -26,20 +26,11 @@ impl StatusLine {
     }
 
     pub fn enter_command_mode(&mut self) {
-        self.content = StatusLineContent::Command(String::from(':'));
+        self.content = StatusLineContent::Command(String::new());
     }
 
     pub fn enter_highlight_pattern_mode(&mut self, value: String) {
         self.content = StatusLineContent::SearchPattern(SearchKind::Highlight, value);
-    }
-
-    fn cursor_x(&self) -> Option<u16> {
-        match &self.content {
-            s @ (StatusLineContent::Command(_) | StatusLineContent::SearchPattern(_, _)) => {
-                Some(s.to_string().len() as u16)
-            }
-            StatusLineContent::Status(_) => None,
-        }
     }
 }
 
@@ -48,13 +39,14 @@ impl<'a> Render<'a> for StatusLine {
 
     fn widget(&'a self) -> Self::Widget {
         tui_widgets::StatusLine::new()
-            .left(self.content.to_string())
+            .left_maybe(self.content.header())
+            .left_maybe(self.content.editable())
+            .cursor_maybe(self.content.editable().is_some())
             .right_maybe(
                 self.line_shown
                     .map(|line| format!("{}/{}", line, self.line_count)),
             )
             .right(self.filename.as_ref())
-            .with_cursor_maybe(self.cursor_x())
     }
 }
 
@@ -86,7 +78,7 @@ impl<'a> React<'a> for StatusLine {
             }
             KeyCode::Enter => match &self.content {
                 StatusLineContent::Command(s) => {
-                    Some(StatusLineReaction::ExecuteCommand(String::from(&s[1..])))
+                    Some(StatusLineReaction::ExecuteCommand(s.clone()))
                 }
                 StatusLineContent::SearchPattern(SearchKind::Highlight, s) => {
                     Some(StatusLineReaction::Highlight(s.clone()))
@@ -115,11 +107,17 @@ pub enum SearchKind {
     // More to follow
 }
 
+impl SearchKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            SearchKind::Highlight => "highlight",
+        }
+    }
+}
+
 impl Display for SearchKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            SearchKind::Highlight => "highlight",
-        })
+        f.write_str(self.as_str())
     }
 }
 
@@ -134,14 +132,20 @@ impl StatusLineContent {
     pub fn with_empty() -> Self {
         StatusLineContent::Status(String::new())
     }
-}
 
-impl Display for StatusLineContent {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn header(&self) -> Option<&str> {
         match self {
-            StatusLineContent::Command(s) => f.write_str(s),
-            StatusLineContent::SearchPattern(h, s) => write!(f, "{} /{}", h, s),
-            StatusLineContent::Status(s) => f.write_str(s),
+            StatusLineContent::Command(_) => None,
+            StatusLineContent::SearchPattern(h, _) => Some(h.as_str()),
+            StatusLineContent::Status(s) => Some(&s),
+        }
+    }
+
+    pub fn editable(&self) -> Option<String> {
+        match self {
+            StatusLineContent::Command(s) => Some(format!(":{}", s)),
+            StatusLineContent::SearchPattern(_, s) => Some(s.to_string()),
+            _ => None,
         }
     }
 }
