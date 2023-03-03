@@ -1,7 +1,9 @@
 use crossterm::event::{KeyEvent, MouseEvent};
 
 pub(crate) mod app;
-pub(crate) mod components;
+mod filter_list;
+mod status_line;
+mod text_area;
 
 pub(crate) trait RenderWithState<'a> {
     type Widget: tui::widgets::StatefulWidget;
@@ -20,7 +22,6 @@ pub(crate) trait Render<'a> {
 }
 
 pub(crate) trait RenderCursor {
-    //TODO: Should coordinate transformation be done inside this method or outside?
     fn cursor(&self, area: tui::layout::Rect) -> Option<Cursor>;
 }
 

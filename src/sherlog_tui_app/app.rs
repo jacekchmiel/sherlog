@@ -8,9 +8,9 @@ use tui::widgets::{ListState, StatefulWidget, Widget};
 use crate::sherlog_core::{Sherlog, TextLineRef};
 use crate::tui_widgets::{ListWithCursor, OverlayBlock};
 
-use super::components::filter_list::{FilterList, FilterListReaction};
-use super::components::status_line::{StatusLine, StatusLineContent, StatusLineReaction};
-use super::components::text_area::TextArea;
+use super::filter_list::{FilterList, FilterListReaction};
+use super::status_line::{StatusLine, StatusLineContent, StatusLineReaction};
+use super::text_area::TextArea;
 use super::{React, Render, RenderCursor, RenderWithState};
 
 pub(crate) struct App {
