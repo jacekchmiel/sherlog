@@ -11,16 +11,16 @@ plugin or full-blown standalone GUI.
 
 ### MVP
 
- - [x] less-like interface with basic scrolling
- - [x] highlighting with regex
- - [x] filtering with regex (single filter)
- - [ ] filtering with regex (multiple negative and positive filters)
-   - [ ] active filter list with ability to add remove
-   - [ ] disabling filters on the list (without removal to be able to enable
-   them again later)
- - [ ] higlighting with regex
-   - [ ] highlighting rules on filter list
- - [ ] saving view state automatically
+- [x] less-like interface with basic scrolling
+- [x] highlighting with regex
+- [x] filtering with regex (single filter)
+- [x] filtering with regex (multiple negative and positive filters)
+  - [x] active filter list with ability to add remove
+  - [x] disabling filters on the list (without removal to be able to enable
+  them again later)
+- [x] higlighting with regex
+  - [ ] highlighting rules on filter list
+- [ ] saving view state automatically
    (stores filtering/higlighting state, restores when file is opened again)
 
 ### Ideas for future far away
