@@ -1,6 +1,6 @@
 use tui::widgets::{List, StatefulWidget};
 
-use crate::sherlog_tui_app::{Cursor, RenderCursor};
+use crate::ty::{Cursor, RenderCursor};
 
 pub(crate) struct ListWithCursor<'a> {
     pub list: List<'a>,
@@ -23,7 +23,7 @@ impl<'a> StatefulWidget for ListWithCursor<'a> {
 }
 
 impl RenderCursor for ListWithCursor<'_> {
-    fn cursor(&self, area: tui::layout::Rect) -> Option<crate::sherlog_tui_app::Cursor> {
+    fn cursor(&self, area: tui::layout::Rect) -> Option<Cursor> {
         self.cursor.map(|c| c.inside(area))
     }
 }

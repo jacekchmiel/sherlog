@@ -12,6 +12,15 @@ impl RegexFilter {
     }
 }
 
+impl From<Regex> for RegexFilter {
+    fn from(pattern: Regex) -> Self {
+        RegexFilter {
+            pattern,
+            negate: false,
+        }
+    }
+}
+
 pub struct Sherlog {
     lines: Vec<String>,
     pub filters: Vec<RegexFilter>,

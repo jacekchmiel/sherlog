@@ -2,8 +2,8 @@ use tui::style::{Color, Style};
 use tui::text::Spans;
 use tui::widgets::{Paragraph, Wrap};
 
-use crate::sherlog_core::{self, TextLine};
-use crate::sherlog_tui_app::Render;
+use crate::ty::Render;
+use sherlog::{self, SpanKind, SpanRef, TextLine};
 
 pub(crate) struct TextArea {
     pub x: usize,
@@ -84,10 +84,10 @@ impl TextArea {
             .into()
     }
 
-    fn make_span<'a>(span: sherlog_core::SpanRef<'a>) -> tui::text::Span<'a> {
+    fn make_span<'a>(span: SpanRef<'a>) -> tui::text::Span<'a> {
         match span.kind {
-            sherlog_core::SpanKind::Raw => tui::text::Span::raw(span.content),
-            sherlog_core::SpanKind::Highlight => {
+            SpanKind::Raw => tui::text::Span::raw(span.content),
+            SpanKind::Highlight => {
                 tui::text::Span::styled(span.content, Style::default().fg(Color::Red))
             }
         }

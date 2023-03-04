@@ -1,11 +1,14 @@
-mod sherlog_core;
-mod sherlog_tui_app;
-mod tui_widgets;
+mod app;
+mod filter_list;
+mod status_line;
+mod text_area;
+mod ty;
+mod widgets;
 
 use std::path::Path;
 
-use sherlog_core::Sherlog;
-use sherlog_tui_app::app::{handle_event, render_app, App};
+use app::{handle_event, render_app, App};
+use sherlog::Sherlog;
 
 use clap::Parser;
 use crossterm::event;

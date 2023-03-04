@@ -5,13 +5,12 @@ use tui::backend::Backend;
 use tui::layout::Rect;
 use tui::widgets::{ListState, StatefulWidget, Widget};
 
-use crate::sherlog_core::{Sherlog, TextLineRef};
-use crate::tui_widgets::{ListWithCursor, OverlayBlock};
-
 use super::filter_list::{FilterList, FilterListReaction};
 use super::status_line::{StatusLine, StatusLineContent, StatusLineReaction};
 use super::text_area::TextArea;
-use super::{React, Render, RenderCursor, RenderWithState};
+use crate::ty::{Cursor, React, Render, RenderCursor, RenderWithState};
+use crate::widgets::{ListWithCursor, OverlayBlock};
+use sherlog::{Sherlog, TextLineRef};
 
 pub(crate) struct App {
     core: Sherlog,
@@ -182,7 +181,7 @@ impl<'a> StatefulWidget for AppWidget<'a> {
 }
 
 impl<'a> RenderCursor for AppWidget<'a> {
-    fn cursor(&self, area: Rect) -> Option<super::Cursor> {
+    fn cursor(&self, area: Rect) -> Option<Cursor> {
         let layout = App::layout(area);
         match self.focus {
             Focus::General => None,

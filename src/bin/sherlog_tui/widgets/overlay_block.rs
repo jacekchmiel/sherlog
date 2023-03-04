@@ -2,7 +2,7 @@ use tui::layout::Rect;
 use tui::style::Style;
 use tui::widgets::{Block, BorderType, Borders, StatefulWidget, Widget};
 
-use crate::sherlog_tui_app::{Cursor, RenderCursor};
+use crate::ty::{Cursor, RenderCursor};
 
 pub struct OverlayBlock<T> {
     inner: T,

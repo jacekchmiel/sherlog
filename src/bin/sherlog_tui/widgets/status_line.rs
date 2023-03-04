@@ -3,7 +3,7 @@ use tui::layout::Rect;
 use tui::text::Text;
 use tui::widgets::Widget;
 
-use crate::sherlog_tui_app::{Cursor, RenderCursor};
+use crate::ty::{Cursor, RenderCursor};
 
 pub struct StatusLine<'a> {
     left_aligned: Vec<Text<'a>>,

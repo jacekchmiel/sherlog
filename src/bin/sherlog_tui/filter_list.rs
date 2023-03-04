@@ -6,9 +6,9 @@ use regex::Regex;
 use tui::style::{Color, Style};
 use tui::widgets::{BorderType, List, ListItem, ListState};
 
-use crate::sherlog_core::RegexFilter;
-use crate::sherlog_tui_app::{Cursor, React, RenderWithState};
-use crate::tui_widgets::{ListWithCursor, OverlayBlock};
+use crate::ty::{Cursor, React, RenderWithState};
+use crate::widgets::{ListWithCursor, OverlayBlock};
+use sherlog::RegexFilter;
 
 #[derive(Default)]
 pub struct FilterList {

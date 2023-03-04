@@ -1,10 +1,5 @@
 use crossterm::event::{KeyEvent, MouseEvent};
 
-pub(crate) mod app;
-mod filter_list;
-mod status_line;
-mod text_area;
-
 pub(crate) trait RenderWithState<'a> {
     type Widget: tui::widgets::StatefulWidget;
 

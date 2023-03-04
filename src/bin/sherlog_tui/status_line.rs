@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use crossterm::event::KeyCode;
 
-use crate::sherlog_tui_app::{React, Render};
-use crate::tui_widgets;
+use crate::ty::{React, Render};
+use crate::widgets;
 
 pub(crate) struct StatusLine {
     pub content: StatusLineContent,
@@ -35,10 +35,10 @@ impl StatusLine {
 }
 
 impl<'a> Render<'a> for StatusLine {
-    type Widget = tui_widgets::StatusLine<'a>;
+    type Widget = widgets::StatusLine<'a>;
 
     fn widget(&'a self) -> Self::Widget {
-        tui_widgets::StatusLine::new()
+        widgets::StatusLine::new()
             .left_maybe(self.content.header())
             .left_maybe(self.content.editable())
             .cursor_maybe(self.content.editable().is_some())
