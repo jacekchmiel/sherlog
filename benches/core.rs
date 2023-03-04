@@ -2,15 +2,13 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use regex::Regex;
 use sherlog::Sherlog;
 
-const TEXT: &'static str = include_str!("journalctl.sample.log");
+const TEXT: &str = include_str!("benchmark.log");
 const TEXT_MULTIPLICATION_FACTOR: usize = 10;
 const LINES_ON_SCREEN: usize = 80;
 const SCROLL_LEN: usize = 200;
 
 fn filter_benchmark(c: &mut Criterion) {
-    let text_multiplied: String = std::iter::repeat(TEXT)
-        .take(TEXT_MULTIPLICATION_FACTOR)
-        .collect();
+    let text_multiplied: String = TEXT.repeat(TEXT_MULTIPLICATION_FACTOR);
 
     c.bench_function("filter request-all-lines", |b| {
         let mut sherlog = Sherlog::new(&text_multiplied);
@@ -20,7 +18,7 @@ fn filter_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function(
-        &format!("filter scroll-{}-lines-from-middle", SCROLL_LEN),
+        &format!("filter scroll-{SCROLL_LEN}-lines-from-middle"),
         |b| {
             let mut sherlog = Sherlog::new(&text_multiplied);
             sherlog.filters = vec![Regex::new("kernel").unwrap().into()];
@@ -38,9 +36,7 @@ fn filter_benchmark(c: &mut Criterion) {
 }
 
 fn unprocessed_benchmark(c: &mut Criterion) {
-    let text_multiplied: String = std::iter::repeat(TEXT)
-        .take(TEXT_MULTIPLICATION_FACTOR)
-        .collect();
+    let text_multiplied: String = TEXT.repeat(TEXT_MULTIPLICATION_FACTOR);
 
     c.bench_function("unprocessed request-all-lines", |b| {
         let mut sherlog = Sherlog::new(&text_multiplied);
@@ -50,7 +46,7 @@ fn unprocessed_benchmark(c: &mut Criterion) {
     });
 
     c.bench_function(
-        &format!("unprocessed scroll-{}-lines-from-middle", SCROLL_LEN),
+        &format!("unprocessed scroll-{SCROLL_LEN}-lines-from-middle"),
         |b| {
             let mut sherlog = Sherlog::new(&text_multiplied);
             sherlog.filters = vec![];

@@ -79,7 +79,7 @@ fn main() -> Result<()> {
     restore_terminal()?;
 
     if let Err(err) = res {
-        println!("{:?}", err)
+        println!("{err:?}")
     }
 
     Ok(())

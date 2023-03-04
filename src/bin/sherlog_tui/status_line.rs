@@ -137,13 +137,13 @@ impl StatusLineContent {
         match self {
             StatusLineContent::Command(_) => None,
             StatusLineContent::SearchPattern(h, _) => Some(h.as_str()),
-            StatusLineContent::Status(s) => Some(&s),
+            StatusLineContent::Status(s) => Some(s),
         }
     }
 
     pub fn editable(&self) -> Option<String> {
         match self {
-            StatusLineContent::Command(s) => Some(format!(":{}", s)),
+            StatusLineContent::Command(s) => Some(format!(":{s}")),
             StatusLineContent::SearchPattern(_, s) => Some(s.to_string()),
             _ => None,
         }

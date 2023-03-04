@@ -1,6 +1,5 @@
 use crossterm::event::{Event, KeyCode, KeyModifiers, MouseEventKind};
 use regex::Regex;
-use tui;
 use tui::backend::Backend;
 use tui::layout::Rect;
 use tui::widgets::{ListState, StatefulWidget, Widget};
@@ -61,21 +60,21 @@ impl App {
         let mut err: Option<String> = None;
         self.focus = Focus::General;
 
-        match &words[..] {
-            &["q" | "quit"] => self.wants_quit = true,
-            &["h" | "highlight", ref rest @ ..] => {
+        match words[..] {
+            ["q" | "quit"] => self.wants_quit = true,
+            ["h" | "highlight", ref rest @ ..] => {
                 let value: String = rest.iter().copied().collect();
                 self.status.enter_highlight_pattern_mode(value);
                 self.focus = Focus::StatusLine;
             }
-            &["w" | "wrap"] => {
+            ["w" | "wrap"] => {
                 if self.text.toggle_wrap() {
                     self.status.print_info("word wrap on");
                 } else {
                     self.status.print_info("word wrap off");
                 }
             }
-            _ => err = Some(format!("Unknown command: {}", command)),
+            _ => err = Some(format!("Unknown command: {command}")),
         }
         if let Some(msg) = err {
             self.status.print_error(msg);
@@ -102,7 +101,7 @@ impl App {
                     self.core.highlight = Some(re);
                     self.status.clear();
                 }
-                Err(e) => self.status.print_error(format!("Invalid pattern: {}", e)),
+                Err(e) => self.status.print_error(format!("Invalid pattern: {e}")),
             }
         }
         self.focus = Focus::General;
@@ -221,7 +220,7 @@ impl<'a> React<'a> for App {
                             .status
                             .print_info("no filters applied - log unfiltered"),
                         1 => self.status.print_info("one filter applied"),
-                        n => self.status.print_info(format!("{} filters applied", n)),
+                        n => self.status.print_info(format!("{n} filters applied")),
                     }
                     self.update_presented_lines()
                 }

@@ -98,7 +98,7 @@ impl RenderCursor for StatusLine<'_> {
     }
 }
 
-fn render_field<'a>(text: Text<'a>, area: Rect, buf: &mut Buffer) {
+fn render_field(text: Text<'_>, area: Rect, buf: &mut Buffer) {
     if text.lines.get(0).is_none() {
         return;
     }
