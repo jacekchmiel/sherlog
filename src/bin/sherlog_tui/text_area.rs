@@ -65,7 +65,7 @@ impl TextArea {
         old_y != self.y
     }
 
-    fn make_spans<'a>(line: &'a TextLine, offset: usize) -> tui::text::Spans<'a> {
+    fn make_spans(line: &TextLine, offset: usize) -> tui::text::Spans<'_> {
         let mut chars_to_remove = offset;
         let spans = line.spans.iter();
         spans
@@ -79,12 +79,12 @@ impl TextArea {
                     Some(remaining)
                 }
             })
-            .map(|s| Self::make_span(s))
+            .map(Self::make_span)
             .collect::<Vec<_>>()
             .into()
     }
 
-    fn make_span<'a>(span: SpanRef<'a>) -> tui::text::Span<'a> {
+    fn make_span(span: SpanRef<'_>) -> tui::text::Span {
         match span.kind {
             SpanKind::Raw => tui::text::Span::raw(span.content),
             SpanKind::Highlight => {

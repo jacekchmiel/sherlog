@@ -48,7 +48,7 @@ impl Sherlog {
 
         filtered_lines
             .into_iter()
-            .map(|(n, line)| self.make_text_line(n + 1, line).to_owned())
+            .map(|(n, line)| self.make_text_line(n + 1, line))
             .collect()
     }
 
@@ -110,7 +110,7 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn remove_left<'a>(&'a self, n: usize) -> SpanRef<'a> {
+    pub fn remove_left(&self, n: usize) -> SpanRef<'_> {
         SpanRef {
             content: &self.content[n..],
             kind: self.kind,
@@ -147,9 +147,9 @@ impl<'a> SpanRef<'a> {
     }
 }
 
-impl<'a> Into<Span> for SpanRef<'a> {
-    fn into(self) -> Span {
-        self.to_span()
+impl<'a> From<SpanRef<'a>> for Span {
+    fn from(val: SpanRef<'a>) -> Self {
+        val.to_span()
     }
 }
 

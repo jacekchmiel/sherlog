@@ -36,7 +36,7 @@ impl FilterList {
     pub fn select_next(&mut self) {
         match self.selected() {
             Some(s) => self.select(s + 1),
-            None if self.entries.len() > 0 => self.select(0),
+            None if !self.entries.is_empty() => self.select(0),
             None => {}
         }
     }
@@ -44,7 +44,7 @@ impl FilterList {
     pub fn select_prev(&mut self) {
         match self.selected() {
             Some(s) => self.select(s.saturating_sub(1)),
-            None if self.entries.len() > 0 => self.select(self.entries.len() - 1),
+            None if !self.entries.is_empty() => self.select(self.entries.len() - 1),
             None => {}
         }
     }
@@ -52,10 +52,10 @@ impl FilterList {
     fn build_list_item(f: &FilterEntry) -> ListItem {
         let mut s = String::new();
         if !f.active {
-            s.push_str("#")
+            s.push('#')
         }
         if f.negate {
-            s.push_str("!");
+            s.push('!');
         }
         if !s.is_empty() {
             s.push(' ')
@@ -65,41 +65,41 @@ impl FilterList {
     }
 
     fn on_edit_insert_char(&mut self, c: char) {
-        match self.selected() {
-            Some(selected) => {
-                self.entries
-                    .get_mut(selected)
-                    .zip(self.edit_cursor.as_mut())
-                    .map(|(filter, cur)| {
-                        filter.insert_at(c, *cur as usize);
-                        *cur += 1;
-                    });
+        if let Some(selected) = self.selected() {
+            if let Some((filter, cursor)) = self
+                .entries
+                .get_mut(selected)
+                .zip(self.edit_cursor.as_mut())
+            {
+                filter.insert_at(c, *cursor as usize);
+                *cursor += 1;
             }
-            None => {}
         }
     }
 
     fn on_edit_backspace(&mut self) {
-        match self.selected() {
-            Some(selected) => {
-                self.entries
-                    .get_mut(selected)
-                    .zip(self.edit_cursor.as_mut())
-                    .map(|(filter, c)| {
-                        filter.backspace_at(*c as usize);
-                        *c = c.saturating_sub(1);
-                    });
+        if let Some(selected) = self.selected() {
+            if let Some((filter, cursor)) = self
+                .entries
+                .get_mut(selected)
+                .zip(self.edit_cursor.as_mut())
+            {
+                filter.backspace_at(*cursor as usize);
+                *cursor = cursor.saturating_sub(1);
             }
-            None => {}
         }
     }
 
     fn on_edit_move_cursor_right(&mut self) {
-        self.edit_cursor.as_mut().map(|c| *c = c.saturating_add(1));
+        if let Some(c) = self.edit_cursor.as_mut() {
+            *c = c.saturating_add(1);
+        }
     }
 
     fn on_edit_move_cursor_left(&mut self) {
-        self.edit_cursor.as_mut().map(|c| *c = c.saturating_sub(1));
+        if let Some(c) = self.edit_cursor.as_mut() {
+            *c = c.saturating_sub(1);
+        }
     }
 
     fn append_new(&mut self) {
@@ -118,15 +118,19 @@ impl FilterList {
         );
     }
 
+    fn selected_filter_mut(&mut self) -> Option<&mut FilterEntry> {
+        self.selected().and_then(|s| self.entries.get_mut(s))
+    }
+
     fn negate_selected(&mut self) {
-        if let Some(selected) = self.selected() {
-            self.entries.get_mut(selected).map(|f| f.negate = !f.negate);
+        if let Some(filter) = self.selected_filter_mut() {
+            filter.negate = !filter.negate
         }
     }
 
     fn toggle_disable_selected(&mut self) {
-        if let Some(selected) = self.selected() {
-            self.entries.get_mut(selected).map(|f| f.active = !f.active);
+        if let Some(filter) = self.selected_filter_mut() {
+            filter.active = !filter.active
         }
     }
 
@@ -169,7 +173,7 @@ impl FilterList {
                     if offset > 0 {
                         offset += 1;
                     }
-                    Cursor::new((cursor + offset) as u16, selected as u16)
+                    Cursor::new(cursor + offset, selected as u16)
                 })
         })
     }
@@ -265,7 +269,7 @@ impl FilterEntry {
         }
 
         let new_left = &left[0..left.len() - 1];
-        let new = format!("{}{}", new_left, right);
+        let new = format!("{new_left}{right}");
         self.value = FilterValue::new(&new);
     }
 
@@ -273,7 +277,7 @@ impl FilterEntry {
         let old = self.value.as_str();
 
         let (left, right) = old.split_at(pos);
-        let new = format!("{}{}{}", left, c, right);
+        let new = format!("{left}{c}{right}");
         self.value = FilterValue::new(&new);
     }
 
@@ -310,7 +314,7 @@ impl FilterValue {
     pub fn as_str(&self) -> &str {
         match self {
             FilterValue::Valid(r) => r.as_str(),
-            FilterValue::Invalid(s) => &s,
+            FilterValue::Invalid(s) => s,
         }
     }
 }
