@@ -220,7 +220,7 @@ impl<'a> React<'a> for App {
                             .status
                             .print_info("no filters applied - log unfiltered"),
                         1 => self.status.print_info("one filter applied"),
-                        n => self.status.print_info(format!("{e} filters applied")),
+                        n => self.status.print_info(format!("{n} filters applied")),
                     }
                     self.update_presented_lines()
                 }
