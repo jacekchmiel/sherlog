@@ -93,12 +93,12 @@ impl App {
 
     fn highlight(&mut self, pattern: &str) {
         if pattern.trim().is_empty() {
-            self.core.highlight = None;
+            self.core.highlight(None);
             self.status.clear();
         } else {
             match Regex::new(pattern) {
                 Ok(re) => {
-                    self.core.highlight = Some(re);
+                    self.core.highlight(Some(re));
                     self.status.clear();
                 }
                 Err(e) => self.status.print_error(format!("Invalid pattern: {e}")),
@@ -214,8 +214,10 @@ impl<'a> React<'a> for App {
                 FilterListReaction::Nothing => {}
                 FilterListReaction::Defocus => {
                     self.focus = Focus::General;
-                    self.core.filters = self.filters.make_regex_filter_vec();
-                    match self.core.filters.len() {
+                    let applied_filters = self.filters.make_regex_filter_vec();
+                    let applied_filters_len = applied_filters.len();
+                    self.core.filter(self.filters.make_regex_filter_vec());
+                    match applied_filters_len {
                         0 => self
                             .status
                             .print_info("no filters applied - log unfiltered"),

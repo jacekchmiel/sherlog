@@ -12,7 +12,7 @@ fn filter_benchmark(c: &mut Criterion) {
 
     c.bench_function("filter request-all-lines", |b| {
         let mut sherlog = Sherlog::new(&text_multiplied);
-        sherlog.filters = vec![Regex::new("kernel").unwrap().into()];
+        sherlog.filter(vec![Regex::new("kernel").unwrap().into()]);
 
         b.iter(|| black_box(sherlog.get_lines(0, None)));
     });
@@ -21,7 +21,7 @@ fn filter_benchmark(c: &mut Criterion) {
         &format!("filter scroll-{SCROLL_LEN}-lines-from-middle"),
         |b| {
             let mut sherlog = Sherlog::new(&text_multiplied);
-            sherlog.filters = vec![Regex::new("kernel").unwrap().into()];
+            sherlog.filter(vec![Regex::new("connection").unwrap().into()]);
             let line_cnt = sherlog.line_count();
             let start = line_cnt / 2;
             let end = start + 200;
@@ -40,7 +40,7 @@ fn unprocessed_benchmark(c: &mut Criterion) {
 
     c.bench_function("unprocessed request-all-lines", |b| {
         let mut sherlog = Sherlog::new(&text_multiplied);
-        sherlog.filters = vec![];
+        sherlog.filter(Vec::new());
 
         b.iter(|| black_box(sherlog.get_lines(0, None)));
     });
@@ -49,7 +49,7 @@ fn unprocessed_benchmark(c: &mut Criterion) {
         &format!("unprocessed scroll-{SCROLL_LEN}-lines-from-middle"),
         |b| {
             let mut sherlog = Sherlog::new(&text_multiplied);
-            sherlog.filters = vec![];
+            sherlog.filter(Vec::new());
 
             let line_cnt = sherlog.line_count();
             const LINES_ON_SCREEN: usize = 80;
