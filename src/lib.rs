@@ -1,6 +1,6 @@
 mod ty;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub use regex::Regex;
 pub use ty::filter::RegexFilter;
@@ -11,7 +11,7 @@ pub struct Sherlog {
     lines: Vec<String>,
     filters: Vec<RegexFilter>,
     highlight: Option<Regex>,
-    index_filtered: Vec<usize>,
+    index_filtered: BTreeSet<usize>,
     index_search: BTreeMap<usize, Vec<(u32, u32)>>,
 }
 
@@ -30,7 +30,7 @@ impl Sherlog {
 
     pub fn filter(&mut self, filters: Vec<RegexFilter>) {
         self.filters = filters;
-        let filtered_lines: Vec<_> = self
+        let filtered_lines: BTreeSet<_> = self
             .lines
             .iter()
             .enumerate()
@@ -40,9 +40,19 @@ impl Sherlog {
         self.index_filtered = filtered_lines;
     }
 
-    pub fn search(&mut self, pattern: Regex) {
-        // Builds search results index
+    pub fn search(&mut self, pattern: Option<Regex>) {
+        match pattern {
+            Some(pattern) => self.do_search(pattern),
+            None => {
+                self.index_search = BTreeMap::new();
+                self.highlight = None;
+            }
+        }
+    }
+
+    fn do_search(&mut self, pattern: Regex) {
         self.index_search = BTreeMap::new();
+        // Builds search results index
         for (n, line) in self.lines.iter().enumerate() {
             for found in pattern.find_iter(line) {
                 self.index_search
@@ -58,11 +68,20 @@ impl Sherlog {
 
     //TODO: consider changing api to iterator
     pub fn next_search_result(&self, start: usize) -> Option<usize> {
-        self.index_search.range(start..).next().map(|i| *i.0)
+        self.index_search
+            .range(start..)
+            // TODO: this find will be inefficient when there is a lot of search matching lines but not a lot filtered
+            .find(|i| self.index_filtered.contains(i.0))
+            .map(|i| *i.0)
     }
 
     pub fn prev_search_result(&self, start: usize) -> Option<usize> {
-        self.index_search.range(..start + 1).last().map(|i| *i.0)
+        self.index_search
+            .range(..start + 1)
+            .rev()
+            // TODO: this find will be inefficient when there is a lot of search matching lines but not a lot filtered
+            .find(|i| self.index_filtered.contains(i.0))
+            .map(|i| *i.0)
     }
 
     pub fn highlight(&mut self, highlight: Option<Regex>) {
@@ -71,14 +90,26 @@ impl Sherlog {
 
     pub fn get_lines(&self, first: usize, cnt: Option<usize>) -> Vec<TextLineRef> {
         self.index_filtered
-            .iter()
-            .skip(first)
+            .range(first..)
             .take(cnt.unwrap_or(usize::MAX))
-            .filter_map(|n| {
-                self.lines
-                    .get(*n)
-                    .map(|line| self.make_text_line(n + 1, line))
-            })
+            .filter_map(|n| self.lines.get(*n).map(|line| self.make_text_line(*n, line)))
+            .collect()
+    }
+
+    pub fn get_lines_rev(&self, last: usize, cnt: Option<usize>) -> Vec<TextLineRef> {
+        // Seems that we cannot get last cnt elements from BTreeSet::Range.
+        // We need to double reverse and to do so we need to store intermediate processed data.
+        let reversed: Vec<_> = self
+            .index_filtered
+            .range(..last.saturating_add(1))
+            .rev()
+            .take(cnt.unwrap_or(usize::MAX))
+            .collect();
+
+        reversed
+            .into_iter()
+            .rev()
+            .filter_map(|n| self.lines.get(*n).map(|line| self.make_text_line(*n, line)))
             .collect()
     }
 
@@ -114,7 +145,7 @@ mod test {
     }
 
     #[test]
-    fn can_provides_all_lines() {
+    fn can_provide_all_lines() {
         let data = "line1\nline2\nline3\n";
         let sherlog = Sherlog::new(data);
         assert_eq!(
@@ -125,6 +156,63 @@ mod test {
                 String::from("line3")
             ]
         );
+    }
+
+    #[test]
+    fn can_scroll_filtered_lines() {
+        let data = "line1\nline2a\nline2b\nline3\nline2c\nline3\n";
+        let mut sherlog = Sherlog::new(data);
+        sherlog.filter(vec!["line2".try_into().unwrap()]);
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(0, None)),
+            vec![
+                String::from("line2a"),
+                String::from("line2b"),
+                String::from("line2c"),
+            ]
+        );
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(0, Some(1))),
+            vec![String::from("line2a")]
+        );
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(0, Some(2))),
+            vec![String::from("line2a"), String::from("line2b"),]
+        );
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(0, Some(3))),
+            vec![
+                String::from("line2a"),
+                String::from("line2b"),
+                String::from("line2c")
+            ]
+        );
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(2, Some(1))),
+            vec![String::from("line2b")]
+        );
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(2, Some(2))),
+            vec![String::from("line2b"), String::from("line2c")]
+        );
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(2, None)),
+            vec![String::from("line2b"), String::from("line2c")]
+        );
+
+        assert_eq!(
+            as_strings(sherlog.get_lines(4, None)),
+            vec![String::from("line2c")]
+        );
+
+        assert_eq!(as_strings(sherlog.get_lines(5, None)), Vec::<String>::new());
     }
 
     #[test]
@@ -142,7 +230,7 @@ mod test {
     fn can_search() {
         let data = "line1\nline2\nline3\n";
         let mut sherlog = Sherlog::new(data);
-        sherlog.search(Regex::new("line2").unwrap());
+        sherlog.search(Some(Regex::new("line2").unwrap()));
         assert_eq!(sherlog.next_search_result(0), Some(1));
         assert_eq!(sherlog.next_search_result(1), Some(1));
         assert_eq!(sherlog.next_search_result(2), None);
@@ -150,6 +238,24 @@ mod test {
 
         assert_eq!(sherlog.prev_search_result(3), Some(1));
         assert_eq!(sherlog.prev_search_result(2), Some(1));
+        assert_eq!(sherlog.prev_search_result(1), Some(1));
+        assert_eq!(sherlog.prev_search_result(0), None);
+    }
+
+    #[test]
+    fn can_search_filtered() {
+        let data = "line1\nline2\nline3\n";
+        let mut sherlog = Sherlog::new(data);
+        sherlog.filter(vec!["line2|3".try_into().unwrap()]);
+        sherlog.search(Some(Regex::new("line").unwrap()));
+
+        assert_eq!(sherlog.next_search_result(0), Some(1));
+        assert_eq!(sherlog.next_search_result(1), Some(1));
+        assert_eq!(sherlog.next_search_result(2), Some(2));
+        assert_eq!(sherlog.next_search_result(3), None);
+
+        assert_eq!(sherlog.prev_search_result(3), Some(2));
+        assert_eq!(sherlog.prev_search_result(2), Some(2));
         assert_eq!(sherlog.prev_search_result(1), Some(1));
         assert_eq!(sherlog.prev_search_result(0), None);
     }

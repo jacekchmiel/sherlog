@@ -7,62 +7,27 @@ use crate::ty::Render;
 
 pub(crate) struct TextArea {
     pub x: usize,
-    pub y: usize,
-    pub max_y: usize,
     pub height: u16, // Shouldn't we get this as render feedback?
     pub wrap: bool,
     pub lines: Vec<TextLine>,
 }
 
 impl TextArea {
-    pub fn new(height: u16, max_y: usize) -> Self {
+    pub fn new(height: u16) -> Self {
         TextArea {
             x: 0,
-            y: 0,
-            max_y,
             height,
             wrap: false,
             lines: vec![],
         }
     }
 
-    pub fn scroll_up(&mut self, line_cnt: usize) -> bool {
-        let old_y = self.y;
-        self.y = self.y.saturating_sub(line_cnt);
-        old_y != self.y
-    }
-
-    pub fn scroll_down(&mut self, line_cnt: usize) -> bool {
-        let old_y = self.y;
-        self.y = self.y.saturating_add(line_cnt);
-        if self.y > self.max_y {
-            self.y = self.max_y;
-        }
-        old_y != self.y
-    }
-
-    pub fn scroll_left(&mut self) -> bool {
-        let old_x = self.x;
+    pub fn scroll_left(&mut self) {
         self.x = self.x.saturating_sub(1);
-        old_x != self.x
     }
 
-    pub fn scroll_right(&mut self) -> bool {
-        let old_x = self.x;
+    pub fn scroll_right(&mut self) {
         self.x = self.x.saturating_add(1);
-        old_x != self.x
-    }
-
-    pub fn go_top(&mut self) -> bool {
-        let old_y = self.y;
-        self.y = 0;
-        old_y != self.y
-    }
-
-    pub fn go_bottom(&mut self) -> bool {
-        let old_y = self.y;
-        self.y = self.max_y;
-        old_y != self.y
     }
 
     fn make_spans(line: &TextLine, offset: usize) -> tui::text::Spans<'_> {
@@ -96,6 +61,14 @@ impl TextArea {
     pub fn toggle_wrap(&mut self) -> bool {
         self.wrap = !self.wrap;
         self.wrap
+    }
+
+    pub fn first_line(&self) -> Option<&TextLine> {
+        self.lines.first()
+    }
+
+    pub fn last_line(&self) -> Option<&TextLine> {
+        self.lines.last()
     }
 }
 

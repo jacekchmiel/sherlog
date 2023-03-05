@@ -27,7 +27,7 @@ impl App {
         let line_count = core.line_count();
         let mut app = App {
             core,
-            text: TextArea::new(terminal_size.height - 1, line_count - 1),
+            text: TextArea::new(terminal_size.height - 1),
             status: StatusLine {
                 content: StatusLineContent::Status(String::from("Type `:` to start command")),
                 filename,
@@ -39,7 +39,7 @@ impl App {
             wants_quit: false,
             search_issued: false,
         };
-        app.update_presented_lines();
+        app.update_displayed_lines();
         app
     }
 
@@ -88,14 +88,46 @@ impl App {
         }
     }
 
-    fn update_presented_lines(&mut self) {
-        self.text.lines = self
-            .core
-            .get_lines(self.text.y, Some(self.text.height as usize))
-            .iter()
-            .map(TextLineRef::to_text_line)
-            .collect();
-        self.status.line_shown = Some(self.text.y + 1);
+    fn display_lines(&mut self, n: usize, dir: DisplayDirection) {
+        let new_lines: Vec<_> = match dir {
+            DisplayDirection::Forward => self.core.get_lines(n, Some(self.text.height as usize)),
+            DisplayDirection::Reverse => {
+                self.core.get_lines_rev(n, Some(self.text.height as usize))
+            }
+        }
+        .iter()
+        .map(TextLineRef::to_text_line)
+        .collect();
+
+        let new_line_idx = new_lines.first().map(|first| first.line_num);
+        self.status.line_shown = new_line_idx;
+        self.text.lines = new_lines;
+    }
+
+    fn update_displayed_lines(&mut self) {
+        self.display_lines(self.first_displayed_line_num(), DisplayDirection::Forward);
+    }
+
+    fn scroll_up(&mut self, n: usize) {
+        self.display_lines(
+            self.last_displayed_line_num().saturating_sub(n),
+            DisplayDirection::Reverse,
+        );
+    }
+
+    fn scroll_down(&mut self, n: usize) {
+        self.display_lines(
+            self.first_displayed_line_num().saturating_add(n),
+            DisplayDirection::Forward,
+        );
+    }
+
+    fn go_top(&mut self) {
+        self.display_lines(0, DisplayDirection::Forward);
+    }
+
+    fn go_bottom(&mut self) {
+        self.display_lines(usize::MAX, DisplayDirection::Reverse);
     }
 
     fn highlight(&mut self, pattern: &str) {
@@ -112,28 +144,45 @@ impl App {
             }
         }
         self.focus = Focus::General;
+        self.update_displayed_lines();
     }
 
     fn search(&mut self, pattern: &str) {
-        match Regex::new(pattern) {
-            Ok(re) => {
-                self.core.search(re);
-                self.status.clear();
+        if pattern.is_empty() {
+            self.core.search(None);
+            self.status.print_info("Search cleared");
+        } else {
+            match Regex::new(pattern) {
+                Ok(re) => {
+                    self.core.search(Some(re));
+                    self.status.clear();
+                }
+                Err(e) => self
+                    .status
+                    .print_error(format!("Invalid search pattern: {e}")),
             }
-            Err(e) => self
-                .status
-                .print_error(format!("Invalid search pattern: {e}")),
-        }
 
-        match self.core.next_search_result(self.text.y) {
-            Some(n) => {
-                self.text.y = n;
-                self.search_issued = true;
+            match self
+                .core
+                .next_search_result(self.first_displayed_line_num())
+            {
+                Some(n) => {
+                    self.search_issued = true;
+                    self.display_lines(n, DisplayDirection::Forward);
+                }
+                None => self
+                    .status
+                    .print_error(format!("Pattern not found: {pattern}")),
             }
-            None => self
-                .status
-                .print_error(format!("Pattern not found: {pattern}")),
         }
+    }
+
+    fn first_displayed_line_num(&self) -> usize {
+        self.text.first_line().map(|l| l.line_num).unwrap_or(0)
+    }
+
+    fn last_displayed_line_num(&self) -> usize {
+        self.text.last_line().map(|l| l.line_num).unwrap_or(0)
     }
 
     fn on_resize(&mut self, x: u16, y: u16) {
@@ -142,43 +191,43 @@ impl App {
         let new_height = chunks[0].height;
         if self.text.height != new_height {
             self.text.height = new_height;
-            self.update_presented_lines();
+            self.display_lines(self.first_displayed_line_num(), DisplayDirection::Forward);
         }
     }
 
-    fn go_to_next_search_result(&mut self) -> bool {
+    fn go_to_next_search_result(&mut self) {
         if !self.search_issued {
             self.status
                 .print_error("No search issued. Use / or search command.");
-            false
         } else {
-            match self.core.next_search_result(self.text.y + 1) {
+            match self
+                .core
+                .next_search_result(self.first_displayed_line_num() + 1)
+            {
                 Some(n) => {
-                    self.text.y = n;
-                    true
+                    self.display_lines(n, DisplayDirection::Forward);
                 }
                 None => {
                     self.status.print_info("No more results below");
-                    false
                 }
             }
         }
     }
 
-    fn go_to_prev_search_result(&mut self) -> bool {
+    fn go_to_prev_search_result(&mut self) {
         if !self.search_issued {
             self.status
                 .print_error("No search issued. Use / or search command.");
-            false
         } else {
-            match self.core.prev_search_result(self.text.y - 1) {
+            match self
+                .core
+                .prev_search_result(self.first_displayed_line_num() - 1)
+            {
                 Some(n) => {
-                    self.text.y = n;
-                    true
+                    self.display_lines(n, DisplayDirection::Forward);
                 }
                 None => {
                     self.status.print_info("No more results upwards");
-                    false
                 }
             }
         }
@@ -203,6 +252,11 @@ impl<'a> RenderWithState<'a> for App {
 }
 const TEXT_LAYOUT_IDX: usize = 0;
 const STATUS_LAYOUT_IDX: usize = 1;
+
+enum DisplayDirection {
+    Forward,
+    Reverse,
+}
 
 pub(crate) struct AppWidget<'a> {
     focus: Focus,
@@ -264,7 +318,6 @@ impl<'a> React<'a> for App {
             self.wants_quit = true;
             return;
         }
-        let mut update_needed = false;
         match self.focus {
             Focus::StatusLine => match self.status.on_key(key) {
                 None => {}
@@ -275,12 +328,10 @@ impl<'a> React<'a> for App {
                 Some(StatusLineReaction::Highlight(s)) => {
                     self.highlight(&s);
                     self.focus = Focus::General;
-                    update_needed = true;
                 }
                 Some(StatusLineReaction::Search(s)) => {
                     self.search(&s);
                     self.focus = Focus::General;
-                    update_needed = true;
                 }
             },
             Focus::Filters => match self.filters.on_key(key) {
@@ -297,64 +348,54 @@ impl<'a> React<'a> for App {
                         1 => self.status.print_info("one filter applied"),
                         n => self.status.print_info(format!("{n} filters applied")),
                     }
-                    self.update_presented_lines()
+                    self.update_displayed_lines()
                 }
             },
             Focus::General => {
-                update_needed = match key.code {
-                    KeyCode::Up => self.text.scroll_up(1),
-                    KeyCode::Down => self.text.scroll_down(1),
+                match key.code {
+                    KeyCode::Up => self.scroll_up(1),
+                    KeyCode::Down => self.scroll_down(1),
                     KeyCode::Left => self.text.scroll_left(),
                     KeyCode::Right => self.text.scroll_right(),
-                    KeyCode::Home => self.text.go_top(),
-                    KeyCode::End => self.text.go_bottom(),
+                    KeyCode::Home => self.go_top(),
+                    KeyCode::End => self.go_bottom(),
                     KeyCode::Esc => {
                         self.focus = Focus::General;
                         self.status.clear();
-                        false
                     }
                     KeyCode::Char(':') => {
                         self.focus = Focus::StatusLine;
                         self.status.enter_command_mode();
-                        false
                     }
                     KeyCode::Char('/') => {
                         self.focus = Focus::StatusLine;
                         self.status.enter_search_mode(String::new());
-                        false
                     }
                     KeyCode::Char('f') => {
                         self.focus = Focus::Filters;
                         self.status
                             .print_info("<a>add  <e>edit  <d>disable (toggle) <n>negate (toggle)");
-                        false
                     }
                     KeyCode::Char('n') => self.go_to_next_search_result(),
                     KeyCode::Char('N') => self.go_to_prev_search_result(),
-                    _ => false,
+                    _ => {}
                 };
             }
-        }
-        if update_needed {
-            self.update_presented_lines();
         }
     }
 
     fn on_mouse(&mut self, mouse: crossterm::event::MouseEvent) -> Self::Reaction {
-        let update_needed = match mouse.kind {
+        match mouse.kind {
             MouseEventKind::ScrollDown if mouse.modifiers == KeyModifiers::CONTROL => {
-                self.text.scroll_down(10)
+                self.scroll_down(10)
             }
             MouseEventKind::ScrollUp if mouse.modifiers == KeyModifiers::CONTROL => {
-                self.text.scroll_up(10)
+                self.scroll_up(10)
             }
-            MouseEventKind::ScrollDown => self.text.scroll_down(3),
-            MouseEventKind::ScrollUp => self.text.scroll_up(3),
-            _ => false,
+            MouseEventKind::ScrollDown => self.scroll_down(3),
+            MouseEventKind::ScrollUp => self.scroll_up(3),
+            _ => {}
         };
-        if update_needed {
-            self.update_presented_lines();
-        }
     }
 }
 
