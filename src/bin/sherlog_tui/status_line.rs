@@ -32,6 +32,10 @@ impl StatusLine {
     pub fn enter_highlight_pattern_mode(&mut self, value: String) {
         self.content = StatusLineContent::SearchPattern(SearchKind::Highlight, value);
     }
+
+    pub fn enter_search_mode(&mut self, value: String) {
+        self.content = StatusLineContent::SearchPattern(SearchKind::Search, value);
+    }
 }
 
 impl<'a> Render<'a> for StatusLine {
@@ -83,6 +87,9 @@ impl<'a> React<'a> for StatusLine {
                 StatusLineContent::SearchPattern(SearchKind::Highlight, s) => {
                     Some(StatusLineReaction::Highlight(s.clone()))
                 }
+                StatusLineContent::SearchPattern(SearchKind::Search, s) => {
+                    Some(StatusLineReaction::Search(s.clone()))
+                }
                 _ => Some(StatusLineReaction::Defocus),
             },
             _ => None,
@@ -99,18 +106,20 @@ pub enum StatusLineReaction {
     Defocus,
     ExecuteCommand(String),
     Highlight(String),
+    Search(String),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum SearchKind {
     Highlight,
-    // More to follow
+    Search,
 }
 
 impl SearchKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             SearchKind::Highlight => "highlight",
+            SearchKind::Search => "search",
         }
     }
 }

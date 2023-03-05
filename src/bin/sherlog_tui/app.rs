@@ -19,6 +19,7 @@ pub(crate) struct App {
 
     focus: Focus,
     pub wants_quit: bool,
+    search_issued: bool,
 }
 
 impl App {
@@ -36,6 +37,7 @@ impl App {
             filters: FilterList::new(),
             focus: Focus::General,
             wants_quit: false,
+            search_issued: false,
         };
         app.update_presented_lines();
         app
@@ -65,6 +67,11 @@ impl App {
             ["h" | "highlight", ref rest @ ..] => {
                 let value: String = rest.iter().copied().collect();
                 self.status.enter_highlight_pattern_mode(value);
+                self.focus = Focus::StatusLine;
+            }
+            ["s" | "search", ref rest @ ..] => {
+                let value: String = rest.iter().copied().collect();
+                self.status.enter_search_mode(value);
                 self.focus = Focus::StatusLine;
             }
             ["w" | "wrap"] => {
@@ -107,6 +114,28 @@ impl App {
         self.focus = Focus::General;
     }
 
+    fn search(&mut self, pattern: &str) {
+        match Regex::new(pattern) {
+            Ok(re) => {
+                self.core.search(re);
+                self.status.clear();
+            }
+            Err(e) => self
+                .status
+                .print_error(format!("Invalid search pattern: {e}")),
+        }
+
+        match self.core.next_search_result(self.text.y) {
+            Some(n) => {
+                self.text.y = n;
+                self.search_issued = true;
+            }
+            None => self
+                .status
+                .print_error(format!("Pattern not found: {pattern}")),
+        }
+    }
+
     fn on_resize(&mut self, x: u16, y: u16) {
         let terminal_size = Rect::new(0, 0, x, y);
         let chunks = Self::layout(terminal_size);
@@ -114,6 +143,44 @@ impl App {
         if self.text.height != new_height {
             self.text.height = new_height;
             self.update_presented_lines();
+        }
+    }
+
+    fn go_to_next_search_result(&mut self) -> bool {
+        if !self.search_issued {
+            self.status
+                .print_error("No search issued. Use / or search command.");
+            false
+        } else {
+            match self.core.next_search_result(self.text.y + 1) {
+                Some(n) => {
+                    self.text.y = n;
+                    true
+                }
+                None => {
+                    self.status.print_info("No more results below");
+                    false
+                }
+            }
+        }
+    }
+
+    fn go_to_prev_search_result(&mut self) -> bool {
+        if !self.search_issued {
+            self.status
+                .print_error("No search issued. Use / or search command.");
+            false
+        } else {
+            match self.core.prev_search_result(self.text.y - 1) {
+                Some(n) => {
+                    self.text.y = n;
+                    true
+                }
+                None => {
+                    self.status.print_info("No more results upwards");
+                    false
+                }
+            }
         }
     }
 }
@@ -207,6 +274,12 @@ impl<'a> React<'a> for App {
                 }
                 Some(StatusLineReaction::Highlight(s)) => {
                     self.highlight(&s);
+                    self.focus = Focus::General;
+                    update_needed = true;
+                }
+                Some(StatusLineReaction::Search(s)) => {
+                    self.search(&s);
+                    self.focus = Focus::General;
                     update_needed = true;
                 }
             },
@@ -240,17 +313,24 @@ impl<'a> React<'a> for App {
                         self.status.clear();
                         false
                     }
-                    KeyCode::Char(':') if self.focus == Focus::General => {
+                    KeyCode::Char(':') => {
                         self.focus = Focus::StatusLine;
                         self.status.enter_command_mode();
                         false
                     }
-                    KeyCode::Char('f') if self.focus == Focus::General => {
+                    KeyCode::Char('/') => {
+                        self.focus = Focus::StatusLine;
+                        self.status.enter_search_mode(String::new());
+                        false
+                    }
+                    KeyCode::Char('f') => {
                         self.focus = Focus::Filters;
                         self.status
                             .print_info("<a>add  <e>edit  <d>disable (toggle) <n>negate (toggle)");
                         false
                     }
+                    KeyCode::Char('n') => self.go_to_next_search_result(),
+                    KeyCode::Char('N') => self.go_to_prev_search_result(),
                     _ => false,
                 };
             }
