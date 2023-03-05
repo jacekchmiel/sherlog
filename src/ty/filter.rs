@@ -20,3 +20,11 @@ impl From<Regex> for RegexFilter {
         }
     }
 }
+
+impl TryFrom<&str> for RegexFilter {
+    type Error = regex::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Regex::new(value).map(RegexFilter::from)
+    }
+}
