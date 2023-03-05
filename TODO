@@ -1,6 +1,25 @@
-# Fixes and quick features shortlist
+# Fixes and quick features shortlist before first release
+
+## Priority
+
+- [ ] Fix scrolling past first
+- [ ] Fix scrolling past last shown
+- [ ] Print line numbers
+- [ ] Fix filter list cursor y coordinate for more filters than overlay can fit
+- [ ] Allow logging in the background
+- [ ] Fix scrolling multiple lines when text is wrapped
+
+## Less priority
 
 - [ ] Esc cancels filter changes, both single line and whole view
+- [ ] printing search matches count and position
+- [ ] allow commands (:) with filter view
+- [ ] send event description to status line/log on user actions (e.g. Filter disabled, filter negated etc)
+- [ ] Print active filters on status line
+- [ ] Use plaintext patterns by default. With easy promotion to regex.
+
+## Hall of fame
+
 - [x] toggle word wrap
 - [x] horizontal movement with arrows
 - [x] render cursor in command input mode
@@ -8,21 +27,13 @@
 - [x] fix horizontal scrolling filtered text
 - [x] rendering filtering list
 - [x] applying multiple filters
-- [ ] search + navigation (next/previous)
-- [ ] printing search matches count and position
-- [ ] allow logging in the background
+- [x] search + navigation (next/previous)
 - [x] add mouse scroll support
 - [x] faster mouse scrolling
 - [x] print current line in status
 - [x] add home/end support
 - [x] ease use of commands: trim whitespace, allow immediate value after whitespace
-- [ ] fix scrolling past last shown when filtered
-- [ ] fix scrolling multiple lines when text is wrapped
 - [x] hierarchical app state and event/input processing
-- [ ] more performant text navigation - full log shouldn't be processed on every key stroke.
-- [ ] remove status/error prompt on :
-- [ ] allow commands (:) with filter view
-- [ ] send event description to status line/log on user actions (e.g. Filter disabled, filter negated etc)
-- [ ] placeholder text for empty filter list (press a to add new filter...)
-- [ ] Fix filter list cursor y coordinate for more filters than overlay can fit
-- [ ] Print active filters on status line
+- [x] more performant text navigation - full log shouldn't be processed on every key stroke.
+- [x] remove status/error prompt on :
+- [x] placeholder text for empty filter list (press a to add new filter...)
