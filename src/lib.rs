@@ -57,8 +57,12 @@ impl Sherlog {
     }
 
     //TODO: consider changing api to iterator
-    pub fn get_line_with_search_results(&self, start: usize) -> Option<usize> {
+    pub fn next_search_result(&self, start: usize) -> Option<usize> {
         self.index_search.range(start..).next().map(|i| *i.0)
+    }
+
+    pub fn prev_search_result(&self, start: usize) -> Option<usize> {
+        self.index_search.range(..start + 1).last().map(|i| *i.0)
     }
 
     pub fn highlight(&mut self, highlight: Option<Regex>) {
@@ -139,9 +143,14 @@ mod test {
         let data = "line1\nline2\nline3\n";
         let mut sherlog = Sherlog::new(data);
         sherlog.search(Regex::new("line2").unwrap());
-        assert_eq!(sherlog.get_line_with_search_results(0), Some(1));
-        assert_eq!(sherlog.get_line_with_search_results(1), Some(1));
-        assert_eq!(sherlog.get_line_with_search_results(2), None);
-        assert_eq!(sherlog.get_line_with_search_results(3), None);
+        assert_eq!(sherlog.next_search_result(0), Some(1));
+        assert_eq!(sherlog.next_search_result(1), Some(1));
+        assert_eq!(sherlog.next_search_result(2), None);
+        assert_eq!(sherlog.next_search_result(3), None);
+
+        assert_eq!(sherlog.prev_search_result(3), Some(1));
+        assert_eq!(sherlog.prev_search_result(2), Some(1));
+        assert_eq!(sherlog.prev_search_result(1), Some(1));
+        assert_eq!(sherlog.prev_search_result(0), None);
     }
 }
