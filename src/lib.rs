@@ -1,54 +1,56 @@
-use regex::Regex;
+mod ty;
 
-#[derive(Clone, Debug)]
-pub struct RegexFilter {
-    pub pattern: Regex,
-    pub negate: bool,
-}
-
-impl RegexFilter {
-    pub fn is_match(&self, line: &str) -> bool {
-        self.pattern.is_match(line) ^ self.negate
-    }
-}
-
-impl From<Regex> for RegexFilter {
-    fn from(pattern: Regex) -> Self {
-        RegexFilter {
-            pattern,
-            negate: false,
-        }
-    }
-}
+pub use regex::Regex;
+pub use ty::filter::RegexFilter;
+pub use ty::span::{SpanKind, SpanRef};
+pub use ty::text::{TextLine, TextLineRef};
 
 pub struct Sherlog {
     lines: Vec<String>,
-    pub filters: Vec<RegexFilter>,
-    pub highlight: Option<Regex>,
+    filters: Vec<RegexFilter>,
+    highlight: Option<Regex>,
+    index_filtered: LineIndex,
 }
 
 impl Sherlog {
     pub fn new(text: &str) -> Self {
+        let lines: Vec<_> = text.lines().map(String::from).collect();
+        let index_filtered = LineIndex((0..lines.len()).collect());
         Sherlog {
-            lines: text.lines().map(String::from).collect(),
+            lines,
             filters: Vec::new(),
             highlight: None,
+            index_filtered,
         }
     }
 
-    pub fn get_lines(&self, first: usize, cnt: Option<usize>) -> Vec<TextLineRef> {
+    pub fn filter(&mut self, filters: Vec<RegexFilter>) {
+        self.filters = filters;
         let filtered_lines: Vec<_> = self
             .lines
             .iter()
             .enumerate()
             .filter(|(_, line)| self.filters.iter().all(|pat| pat.is_match(line)))
+            .map(|(n, _)| n)
+            .collect();
+        self.index_filtered = LineIndex(filtered_lines);
+    }
+
+    pub fn highlight(&mut self, highlight: Option<Regex>) {
+        self.highlight = highlight
+    }
+
+    pub fn get_lines(&self, first: usize, cnt: Option<usize>) -> Vec<TextLineRef> {
+        self.index_filtered
+            .0
+            .iter()
             .skip(first)
             .take(cnt.unwrap_or(usize::MAX))
-            .collect();
-
-        filtered_lines
-            .into_iter()
-            .map(|(n, line)| self.make_text_line(n + 1, line))
+            .filter_map(|n| {
+                self.lines
+                    .get(*n)
+                    .map(|line| self.make_text_line(n + 1, line))
+            })
             .collect()
     }
 
@@ -75,86 +77,23 @@ impl Sherlog {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct TextLine {
-    pub line_num: usize,
-    pub spans: Vec<Span>,
-}
+struct LineIndex(Vec<usize>);
 
-#[derive(Debug, Clone)]
-pub struct TextLineRef<'a> {
-    pub line_num: usize,
-    pub spans: Vec<SpanRef<'a>>,
-}
+#[cfg(test)]
+mod test {
+    use super::*;
 
-impl<'a> TextLineRef<'a> {
-    pub fn raw(line_num: usize, text: &'a str) -> Self {
-        TextLineRef {
-            line_num,
-            spans: vec![SpanRef::raw(text)],
-        }
+    fn as_strings(lines: Vec<TextLineRef>) -> Vec<String> {
+        lines.into_iter().map(|l| l.to_string()).collect()
     }
 
-    pub fn to_text_line(&self) -> TextLine {
-        TextLine {
-            line_num: self.line_num,
-            spans: self.spans.iter().map(SpanRef::to_span).collect(),
-        }
+    #[test]
+    fn provides_lines() {
+        let data = "line1\nline2\n";
+        let sherlog = Sherlog::new(data);
+        assert_eq!(
+            as_strings(sherlog.get_lines(0, None)),
+            vec![String::from("line1"), String::from("line2")]
+        );
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct Span {
-    pub content: String,
-    pub kind: SpanKind,
-}
-
-impl Span {
-    pub fn remove_left(&self, n: usize) -> SpanRef<'_> {
-        SpanRef {
-            content: &self.content[n..],
-            kind: self.kind,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SpanRef<'a> {
-    pub content: &'a str,
-    pub kind: SpanKind,
-}
-
-impl<'a> SpanRef<'a> {
-    pub fn raw(content: &'a str) -> Self {
-        SpanRef {
-            content,
-            kind: SpanKind::Raw,
-        }
-    }
-
-    pub fn highlight(content: &'a str) -> Self {
-        SpanRef {
-            content,
-            kind: SpanKind::Highlight,
-        }
-    }
-
-    pub fn to_span(&self) -> Span {
-        Span {
-            content: self.content.into(),
-            kind: self.kind,
-        }
-    }
-}
-
-impl<'a> From<SpanRef<'a>> for Span {
-    fn from(val: SpanRef<'a>) -> Self {
-        val.to_span()
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum SpanKind {
-    Raw,
-    Highlight,
 }

@@ -1,9 +1,9 @@
+use sherlog::{SpanKind, SpanRef, TextLine};
 use tui::style::{Color, Style};
 use tui::text::Spans;
 use tui::widgets::{Paragraph, Wrap};
 
 use crate::ty::Render;
-use sherlog::{self, SpanKind, SpanRef, TextLine};
 
 pub(crate) struct TextArea {
     pub x: usize,
