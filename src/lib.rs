@@ -2,6 +2,7 @@ mod ty;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use log::debug;
 pub use regex::Regex;
 pub use ty::filter::RegexFilter;
 pub use ty::span::{SpanKind, SpanRef};
@@ -89,14 +90,21 @@ impl Sherlog {
     }
 
     pub fn get_lines(&self, first: usize, cnt: Option<usize>) -> Vec<TextLineRef> {
-        self.index_filtered
+        debug!("get_lines - first: {first} cnt: {cnt:?}");
+        let lines: Vec<_> = self
+            .index_filtered
             .range(first..)
             .take(cnt.unwrap_or(usize::MAX))
             .filter_map(|n| self.lines.get(*n).map(|line| self.make_text_line(*n, line)))
-            .collect()
+            .collect();
+
+        log_returned_lines("get_lines", lines.as_slice());
+
+        lines
     }
 
     pub fn get_lines_rev(&self, last: usize, cnt: Option<usize>) -> Vec<TextLineRef> {
+        debug!("get_lines_rev - last: {last} cnt: {cnt:?}");
         // Seems that we cannot get last cnt elements from BTreeSet::Range.
         // We need to double reverse and to do so we need to store intermediate processed data.
         let reversed: Vec<_> = self
@@ -106,11 +114,14 @@ impl Sherlog {
             .take(cnt.unwrap_or(usize::MAX))
             .collect();
 
-        reversed
+        let lines: Vec<_> = reversed
             .into_iter()
             .rev()
             .filter_map(|n| self.lines.get(*n).map(|line| self.make_text_line(*n, line)))
-            .collect()
+            .collect();
+
+        log_returned_lines("get_lines_rev", lines.as_slice());
+        lines
     }
 
     fn make_text_line<'a>(&'a self, n: usize, line: &'a str) -> TextLineRef<'a> {
@@ -136,6 +147,18 @@ impl Sherlog {
     }
 }
 
+fn log_returned_lines(func: &str, lines: &[TextLineRef<'_>]) {
+    match lines {
+        [single] => debug!("{func} - return single line {}", single.line_num),
+        [first, .., last] => {
+            debug!(
+                "{func} - return lines {} - {}",
+                first.line_num, last.line_num
+            )
+        }
+        [] => debug!("{func} - return empty"),
+    }
+}
 #[cfg(test)]
 mod test {
     use super::*;

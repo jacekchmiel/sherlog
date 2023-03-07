@@ -7,12 +7,15 @@ mod widgets;
 
 use std::path::Path;
 
+use anyhow::Result;
 use app::App;
-use sherlog::Sherlog;
-
 use clap::Parser;
 use crossterm::event;
-use crossterm::{execute, terminal, Result};
+use crossterm::{execute, terminal};
+use log::{info, LevelFilter};
+use log4rs::append::file::FileAppender;
+use log4rs::config::{Appender, Root};
+use sherlog::Sherlog;
 use tui::backend::{Backend, CrosstermBackend};
 use tui::Terminal;
 
@@ -34,6 +37,10 @@ struct Args {
     /// Input file
     #[arg(value_name = "LOG_FILE")]
     input: String,
+
+    /// Provide debug log during execution
+    #[arg(short, long)]
+    debug: bool,
 }
 
 fn restore_terminal() -> Result<()> {
@@ -48,6 +55,25 @@ fn restore_terminal() -> Result<()> {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    // setup logging
+    if args.debug {
+        let logfile = FileAppender::builder()
+            // .encoder(Box::new(PatternEncoder::new("{l} - {m}\n")))
+            .build("sherlog.log")?;
+
+        let config = log4rs::Config::builder()
+            .appender(Appender::builder().build("logfile", Box::new(logfile)))
+            .build(
+                Root::builder()
+                    .appender("logfile")
+                    .build(LevelFilter::Debug),
+            )?;
+
+        log4rs::init_config(config)?;
+        info!("Sherlog started with {}", args.input);
+    }
+
     let log_data = std::fs::read_to_string(&args.input)?;
     let filename = Path::new(&args.input)
         .file_name()
