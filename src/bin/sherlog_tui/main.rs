@@ -7,7 +7,7 @@ mod widgets;
 
 use std::path::Path;
 
-use app::{handle_event, render_app, App};
+use app::App;
 use sherlog::Sherlog;
 
 use clap::Parser;
@@ -18,8 +18,8 @@ use tui::Terminal;
 
 fn run_app<B: Backend + std::io::Write>(terminal: &mut Terminal<B>, mut app: App) -> Result<()> {
     loop {
-        terminal.draw(|f| render_app(&mut app, f))?;
-        handle_event(&mut app, event::read()?);
+        terminal.draw(|f| app.render(f))?;
+        app.handle_event(event::read()?);
         if app.wants_quit {
             return Ok(());
         }

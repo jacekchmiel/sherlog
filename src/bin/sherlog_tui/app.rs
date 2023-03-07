@@ -235,6 +235,45 @@ impl App {
             }
         }
     }
+
+    pub fn render<B: Backend>(&mut self, f: &mut tui::Frame<B>) {
+        let area = f.size();
+        let layout = App::layout(area);
+        let text = self.text.widget();
+        let status = self.status.widget();
+        let filters_popup = make_filter_popup_area(f);
+        let filters = if self.focus == Focus::Filters {
+            Some(self.filters.widget())
+        } else {
+            None
+        };
+
+        let cursor = match self.focus {
+            Focus::General => None,
+            Focus::StatusLine => status.cursor(layout[STATUS_LAYOUT_IDX]),
+            Focus::Filters => filters.as_ref().and_then(|f| f.0.cursor(filters_popup)),
+        };
+
+        f.render_widget(text, layout[TEXT_LAYOUT_IDX]);
+        f.render_widget(status, layout[STATUS_LAYOUT_IDX]);
+
+        if let Some(filters) = filters {
+            f.render_stateful_widget(filters.0, filters_popup, filters.1);
+        }
+
+        if let Some(c) = cursor {
+            f.set_cursor(c.x, c.y)
+        }
+    }
+
+    pub fn handle_event(&mut self, event: Event) {
+        match event {
+            Event::Key(key) => self.on_key(key),
+            Event::Mouse(mouse) => self.on_mouse(mouse),
+            Event::Resize(x, y) => self.on_resize(x, y),
+            _ => (),
+        }
+    }
 }
 
 const TEXT_LAYOUT_IDX: usize = 0;
@@ -340,36 +379,6 @@ pub enum Focus {
     Filters,
 }
 
-pub(crate) fn render_app<B: Backend>(app: &mut App, f: &mut tui::Frame<B>) {
-    let area = f.size();
-    let layout = App::layout(area);
-    let text = app.text.widget();
-    let status = app.status.widget();
-    let filters_popup = make_filter_popup_area(f);
-    let filters = if app.focus == Focus::Filters {
-        Some(app.filters.widget())
-    } else {
-        None
-    };
-
-    let cursor = match app.focus {
-        Focus::General => None,
-        Focus::StatusLine => status.cursor(layout[STATUS_LAYOUT_IDX]),
-        Focus::Filters => filters.as_ref().and_then(|f| f.0.cursor(filters_popup)),
-    };
-
-    f.render_widget(text, layout[TEXT_LAYOUT_IDX]);
-    f.render_widget(status, layout[STATUS_LAYOUT_IDX]);
-
-    if let Some(filters) = filters {
-        f.render_stateful_widget(filters.0, filters_popup, filters.1);
-    }
-
-    if let Some(c) = cursor {
-        f.set_cursor(c.x, c.y)
-    }
-}
-
 fn make_filter_popup_area<B: Backend>(f: &tui::Frame<B>) -> Rect {
     tui::layout::Layout::default()
         .horizontal_margin(5)
@@ -380,13 +389,4 @@ fn make_filter_popup_area<B: Backend>(f: &tui::Frame<B>) -> Rect {
             tui::layout::Constraint::Ratio(1, 2),
         ])
         .split(f.size())[1]
-}
-
-pub(crate) fn handle_event(app: &mut App, event: Event) {
-    match event {
-        Event::Key(key) => app.on_key(key),
-        Event::Mouse(mouse) => app.on_mouse(mouse),
-        Event::Resize(x, y) => app.on_resize(x, y),
-        _ => (),
-    }
 }
