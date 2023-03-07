@@ -38,10 +38,10 @@ impl StatusLine {
     }
 }
 
-impl<'a> Render<'a> for StatusLine {
-    type Widget = widgets::StatusLine<'a>;
+impl Render for StatusLine {
+    type Widget<'a> = widgets::StatusLine<'a>;
 
-    fn widget(&'a self) -> Self::Widget {
+    fn widget(&self) -> Self::Widget<'_> {
         widgets::StatusLine::new()
             .left_maybe(self.content.header())
             .left_maybe(self.content.editable())

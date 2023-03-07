@@ -1,19 +1,25 @@
 use crossterm::event::{KeyEvent, MouseEvent};
 
-pub(crate) trait RenderWithState<'a> {
-    type Widget: tui::widgets::StatefulWidget;
+// Unfortunately it's impossible to compose stateful widgets in this
+// design since this would require to also compose state references into a single object.
+pub(crate) trait RenderWithState {
+    type Widget<'a>: tui::widgets::StatefulWidget
+    where
+        Self: 'a;
 
     fn widget(
-        &'a mut self,
+        &mut self,
     ) -> (
-        Self::Widget,
-        &mut <Self::Widget as tui::widgets::StatefulWidget>::State,
+        Self::Widget<'_>,
+        &mut <Self::Widget<'_> as tui::widgets::StatefulWidget>::State,
     );
 }
 
-pub(crate) trait Render<'a> {
-    type Widget: tui::widgets::Widget;
-    fn widget(&'a self) -> Self::Widget;
+pub(crate) trait Render {
+    type Widget<'a>
+    where
+        Self: 'a;
+    fn widget(&self) -> Self::Widget<'_>;
 }
 
 pub(crate) trait RenderCursor {
