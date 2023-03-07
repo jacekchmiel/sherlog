@@ -1,3 +1,4 @@
 /target
 .vscode
 *.sample.log
+sherlog.log

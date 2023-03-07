@@ -92,13 +92,14 @@ impl App {
         // We request number of lines equal to terminal height as an upper approximation of what we can render. Text
         // area might be smaller but this seems as a good compromise and we don't have to track exact text area size
         // which depends on current layout or is ultimately determined turing render function execution.
+        let request_cnt = self.terminal_size.height as usize;
+
         let new_lines: Vec<_> = match dir {
-            DisplayDirection::Forward => self
-                .core
-                .get_lines(n, Some(self.terminal_size.height as usize)),
-            DisplayDirection::Reverse => self
-                .core
-                .get_lines_rev(n, Some(self.terminal_size.height as usize)),
+            DisplayDirection::Forward => self.core.get_lines(n, Some(request_cnt)),
+            DisplayDirection::Reverse if n < request_cnt => {
+                self.core.get_lines(0, Some(request_cnt))
+            }
+            DisplayDirection::Reverse => self.core.get_lines_rev(n, Some(request_cnt)),
         }
         .iter()
         .map(TextLineRef::to_text_line)
