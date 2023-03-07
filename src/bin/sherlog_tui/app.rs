@@ -11,6 +11,7 @@ use sherlog::{Sherlog, TextLineRef};
 
 pub(crate) struct App {
     core: Sherlog,
+    terminal_size: Rect,
     text: TextArea,
     status: StatusLine,
     filters: FilterList,
@@ -25,7 +26,8 @@ impl App {
         let line_count = core.line_count();
         let mut app = App {
             core,
-            text: TextArea::new(terminal_size.height - 1),
+            terminal_size,
+            text: TextArea::new(),
             status: StatusLine {
                 content: StatusLineContent::Status(String::from("Type `:` to start command")),
                 filename,
@@ -87,11 +89,16 @@ impl App {
     }
 
     fn display_lines(&mut self, n: usize, dir: DisplayDirection) {
+        // We request number of lines equal to terminal height as an upper approximation of what we can render. Text
+        // area might be smaller but this seems as a good compromise and we don't have to track exact text area size
+        // which depends on current layout or is ultimately determined turing render function execution.
         let new_lines: Vec<_> = match dir {
-            DisplayDirection::Forward => self.core.get_lines(n, Some(self.text.height as usize)),
-            DisplayDirection::Reverse => {
-                self.core.get_lines_rev(n, Some(self.text.height as usize))
-            }
+            DisplayDirection::Forward => self
+                .core
+                .get_lines(n, Some(self.terminal_size.height as usize)),
+            DisplayDirection::Reverse => self
+                .core
+                .get_lines_rev(n, Some(self.terminal_size.height as usize)),
         }
         .iter()
         .map(TextLineRef::to_text_line)
@@ -184,11 +191,9 @@ impl App {
     }
 
     fn on_resize(&mut self, x: u16, y: u16) {
-        let terminal_size = Rect::new(0, 0, x, y);
-        let chunks = Self::layout(terminal_size);
-        let new_height = chunks[0].height;
-        if self.text.height != new_height {
-            self.text.height = new_height;
+        let new_terminal_size = Rect::new(0, 0, x, y);
+        if self.terminal_size != new_terminal_size {
+            self.terminal_size = new_terminal_size;
             self.display_lines(self.first_displayed_line_num(), DisplayDirection::Forward);
         }
     }
@@ -239,47 +244,6 @@ enum DisplayDirection {
     Forward,
     Reverse,
 }
-
-// pub(crate) struct AppWidget<'a> {
-//     focus: Focus,
-//     text: <TextArea as Render>::Widget<'a>,
-//     status: <StatusLine as Render>::Widget,
-//     filters: OverlayBlock<ListWithCursor<'a>>,
-// }
-
-// impl AppWidget<'_> {}
-
-// impl<'a> StatefulWidget for AppWidget<'a> {
-//     type State = ListState;
-
-//     fn render(self, area: Rect, buf: &mut tui::buffer::Buffer, state: &mut Self::State) {
-//         let layout = App::layout(area);
-//         let filter_popup_area = self.make_filter_popup_area(area);
-//         self.text.render(layout[TEXT_LAYOUT_IDX], buf);
-//         self.status.render(layout[STATUS_LAYOUT_IDX], buf);
-
-//         if self.focus == Focus::Filters {
-//             // This is ugly :/
-//             <OverlayBlock<ListWithCursor<'a>> as StatefulWidget>::render(
-//                 self.filters,
-//                 filter_popup_area,
-//                 buf,
-//                 state,
-//             );
-//         }
-//     }
-// }
-
-// impl<'a> RenderCursor for AppWidget<'a> {
-//     fn cursor(&self, area: Rect) -> Option<Cursor> {
-//         let layout = App::layout(area);
-//         match self.focus {
-//             Focus::General => None,
-//             Focus::StatusLine => self.status.cursor(layout[STATUS_LAYOUT_IDX]),
-//             Focus::Filters => self.filters.cursor(self.make_filter_popup_area(area)),
-//         }
-//     }
-// }
 
 impl<'a> React<'a> for App {
     type Reaction = ();

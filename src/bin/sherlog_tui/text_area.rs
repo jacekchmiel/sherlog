@@ -7,16 +7,14 @@ use crate::ty::Render;
 
 pub(crate) struct TextArea {
     pub x: usize,
-    pub height: u16, // Shouldn't we get this as render feedback?
     pub wrap: bool,
     pub lines: Vec<TextLine>,
 }
 
 impl TextArea {
-    pub fn new(height: u16) -> Self {
+    pub fn new() -> Self {
         TextArea {
             x: 0,
-            height,
             wrap: false,
             lines: vec![],
         }
