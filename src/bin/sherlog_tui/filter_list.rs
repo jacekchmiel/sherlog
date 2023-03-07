@@ -14,7 +14,7 @@ use sherlog::RegexFilter;
 pub struct FilterList {
     pub entries: Vec<FilterEntry>,
     edit_cursor: Option<u16>,
-    state: ListState,
+    pub state: ListState,
 }
 
 impl FilterList {
@@ -179,10 +179,15 @@ impl FilterList {
     }
 }
 
-impl<'a> RenderWithState<'a> for FilterList {
-    type Widget = OverlayBlock<ListWithCursor<'a>>;
+impl RenderWithState for FilterList {
+    type Widget<'a> = OverlayBlock<ListWithCursor<'a>>;
 
-    fn widget(&'a mut self) -> (Self::Widget, &mut ListState) {
+    fn widget(
+        &mut self,
+    ) -> (
+        Self::Widget<'_>,
+        &mut <Self::Widget<'_> as tui::widgets::StatefulWidget>::State,
+    ) {
         (
             OverlayBlock::new(ListWithCursor {
                 list: List::new(

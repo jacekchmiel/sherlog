@@ -2,13 +2,11 @@ use crossterm::event::{Event, KeyCode, KeyModifiers, MouseEventKind};
 use regex::Regex;
 use tui::backend::Backend;
 use tui::layout::Rect;
-use tui::widgets::{ListState, StatefulWidget, Widget};
 
 use super::filter_list::{FilterList, FilterListReaction};
 use super::status_line::{StatusLine, StatusLineContent, StatusLineReaction};
 use super::text_area::TextArea;
-use crate::ty::{Cursor, React, Render, RenderCursor, RenderWithState};
-use crate::widgets::{ListWithCursor, OverlayBlock};
+use crate::ty::{React, Render, RenderCursor, RenderWithState};
 use sherlog::{Sherlog, TextLineRef};
 
 pub(crate) struct App {
@@ -234,22 +232,6 @@ impl App {
     }
 }
 
-impl<'a> RenderWithState<'a> for App {
-    type Widget = AppWidget<'a>;
-
-    fn widget(&'a mut self) -> (Self::Widget, &mut ListState) {
-        let (filters_widget, filters_state) = self.filters.widget();
-        (
-            AppWidget {
-                focus: self.focus,
-                text: self.text.widget(),
-                status: self.status.widget(),
-                filters: filters_widget,
-            },
-            filters_state,
-        )
-    }
-}
 const TEXT_LAYOUT_IDX: usize = 0;
 const STATUS_LAYOUT_IDX: usize = 1;
 
@@ -258,58 +240,46 @@ enum DisplayDirection {
     Reverse,
 }
 
-pub(crate) struct AppWidget<'a> {
-    focus: Focus,
-    text: <TextArea as Render<'a>>::Widget,
-    status: <StatusLine as Render<'a>>::Widget,
-    filters: OverlayBlock<ListWithCursor<'a>>,
-}
+// pub(crate) struct AppWidget<'a> {
+//     focus: Focus,
+//     text: <TextArea as Render>::Widget<'a>,
+//     status: <StatusLine as Render>::Widget,
+//     filters: OverlayBlock<ListWithCursor<'a>>,
+// }
 
-impl AppWidget<'_> {
-    fn make_filter_popup_area(&self, area: Rect) -> Rect {
-        tui::layout::Layout::default()
-            .horizontal_margin(5)
-            .vertical_margin(1)
-            .direction(tui::layout::Direction::Vertical)
-            .constraints([
-                tui::layout::Constraint::Min(0),
-                tui::layout::Constraint::Ratio(1, 2),
-            ])
-            .split(area)[1]
-    }
-}
+// impl AppWidget<'_> {}
 
-impl<'a> StatefulWidget for AppWidget<'a> {
-    type State = ListState;
+// impl<'a> StatefulWidget for AppWidget<'a> {
+//     type State = ListState;
 
-    fn render(self, area: Rect, buf: &mut tui::buffer::Buffer, state: &mut Self::State) {
-        let layout = App::layout(area);
-        let filter_popup_area = self.make_filter_popup_area(area);
-        self.text.render(layout[TEXT_LAYOUT_IDX], buf);
-        self.status.render(layout[STATUS_LAYOUT_IDX], buf);
+//     fn render(self, area: Rect, buf: &mut tui::buffer::Buffer, state: &mut Self::State) {
+//         let layout = App::layout(area);
+//         let filter_popup_area = self.make_filter_popup_area(area);
+//         self.text.render(layout[TEXT_LAYOUT_IDX], buf);
+//         self.status.render(layout[STATUS_LAYOUT_IDX], buf);
 
-        if self.focus == Focus::Filters {
-            // This is ugly :/
-            <OverlayBlock<ListWithCursor<'a>> as StatefulWidget>::render(
-                self.filters,
-                filter_popup_area,
-                buf,
-                state,
-            );
-        }
-    }
-}
+//         if self.focus == Focus::Filters {
+//             // This is ugly :/
+//             <OverlayBlock<ListWithCursor<'a>> as StatefulWidget>::render(
+//                 self.filters,
+//                 filter_popup_area,
+//                 buf,
+//                 state,
+//             );
+//         }
+//     }
+// }
 
-impl<'a> RenderCursor for AppWidget<'a> {
-    fn cursor(&self, area: Rect) -> Option<Cursor> {
-        let layout = App::layout(area);
-        match self.focus {
-            Focus::General => None,
-            Focus::StatusLine => self.status.cursor(layout[STATUS_LAYOUT_IDX]),
-            Focus::Filters => self.filters.cursor(self.make_filter_popup_area(area)),
-        }
-    }
-}
+// impl<'a> RenderCursor for AppWidget<'a> {
+//     fn cursor(&self, area: Rect) -> Option<Cursor> {
+//         let layout = App::layout(area);
+//         match self.focus {
+//             Focus::General => None,
+//             Focus::StatusLine => self.status.cursor(layout[STATUS_LAYOUT_IDX]),
+//             Focus::Filters => self.filters.cursor(self.make_filter_popup_area(area)),
+//         }
+//     }
+// }
 
 impl<'a> React<'a> for App {
     type Reaction = ();
@@ -408,13 +378,44 @@ pub enum Focus {
 
 pub(crate) fn render_app<B: Backend>(app: &mut App, f: &mut tui::Frame<B>) {
     let area = f.size();
-    let (app_widget, app_state) = app.widget();
-    let cursor = app_widget.cursor(area);
-    f.render_stateful_widget(app_widget, area, app_state);
+    let layout = App::layout(area);
+    let text = app.text.widget();
+    let status = app.status.widget();
+    let filters_popup = make_filter_popup_area(f);
+    let filters = if app.focus == Focus::Filters {
+        Some(app.filters.widget())
+    } else {
+        None
+    };
+
+    let cursor = match app.focus {
+        Focus::General => None,
+        Focus::StatusLine => status.cursor(layout[STATUS_LAYOUT_IDX]),
+        Focus::Filters => filters.as_ref().and_then(|f| f.0.cursor(filters_popup)),
+    };
+
+    f.render_widget(text, layout[TEXT_LAYOUT_IDX]);
+    f.render_widget(status, layout[STATUS_LAYOUT_IDX]);
+
+    if let Some(filters) = filters {
+        f.render_stateful_widget(filters.0, filters_popup, filters.1);
+    }
 
     if let Some(c) = cursor {
         f.set_cursor(c.x, c.y)
     }
+}
+
+fn make_filter_popup_area<B: Backend>(f: &tui::Frame<B>) -> Rect {
+    tui::layout::Layout::default()
+        .horizontal_margin(5)
+        .vertical_margin(1)
+        .direction(tui::layout::Direction::Vertical)
+        .constraints([
+            tui::layout::Constraint::Min(0),
+            tui::layout::Constraint::Ratio(1, 2),
+        ])
+        .split(f.size())[1]
 }
 
 pub(crate) fn handle_event(app: &mut App, event: Event) {

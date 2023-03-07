@@ -72,10 +72,10 @@ impl TextArea {
     }
 }
 
-impl<'a> Render<'a> for TextArea {
-    type Widget = Paragraph<'a>;
+impl Render for TextArea {
+    type Widget<'a> = Paragraph<'a>;
 
-    fn widget(&'a self) -> Paragraph<'a> {
+    fn widget(&self) -> Paragraph<'_> {
         let spans: Vec<Spans> = self
             .lines
             .iter()
