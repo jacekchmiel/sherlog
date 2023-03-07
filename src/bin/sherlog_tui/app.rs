@@ -89,12 +89,15 @@ impl App {
     }
 
     fn display_lines(&mut self, n: usize, dir: DisplayDirection) {
-        // We request number of lines equal to terminal height as an upper approximation of what we can render. Text
-        // area might be smaller but this seems as a good compromise and we don't have to track exact text area size
-        // which depends on current layout or is ultimately determined turing render function execution.
-        let request_cnt = self.terminal_size.height as usize;
+        // Until the text widget is aware of it's position within provided lines
+        // we need to request exact number of lines for correct navigation.
+        let request_cnt = (self.terminal_size.height - 1) as usize;
 
         let new_lines: Vec<_> = match dir {
+            DisplayDirection::Forward if request_cnt + n > self.core.line_count() => self
+                .core
+                .get_lines_rev(self.core.line_count() - 1, Some(request_cnt)),
+
             DisplayDirection::Forward => self.core.get_lines(n, Some(request_cnt)),
             DisplayDirection::Reverse if n < request_cnt => {
                 self.core.get_lines(0, Some(request_cnt))
@@ -105,9 +108,12 @@ impl App {
         .map(TextLineRef::to_text_line)
         .collect();
 
-        let new_line_idx = new_lines.first().map(|first| first.line_num);
-        self.status.line_shown = new_line_idx;
-        self.text.lines = new_lines;
+        // Don't update view if we reached end
+        if !new_lines.is_empty() {
+            let new_line_idx = new_lines.first().map(|first| first.line_num);
+            self.status.line_shown = new_line_idx;
+            self.text.lines = new_lines;
+        }
     }
 
     fn update_displayed_lines(&mut self) {

@@ -2,8 +2,6 @@
 
 ## Priority
 
-- [ ] Fix scrolling past first
-- [ ] Fix scrolling past last shown
 - [ ] Print line numbers
 - [ ] Fix filter list cursor y coordinate for more filters than overlay can fit
 - [ ] Allow logging in the background
@@ -37,3 +35,5 @@
 - [x] more performant text navigation - full log shouldn't be processed on every key stroke.
 - [x] remove status/error prompt on :
 - [x] placeholder text for empty filter list (press a to add new filter...)
+- [x] Fix scrolling past first
+- [x] Fix scrolling past last shown
