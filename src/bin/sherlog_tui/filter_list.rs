@@ -4,10 +4,10 @@ use std::str::FromStr;
 use crossterm::event::KeyCode;
 use regex::Regex;
 use tui::style::{Color, Style};
-use tui::widgets::{BorderType, List, ListItem, ListState};
+use tui::widgets::{Block, BorderType, Borders, List, ListItem, ListState};
 
 use crate::ty::{Cursor, React, RenderWithState};
-use crate::widgets::{ListWithCursor, OverlayBlock};
+use crate::widgets::{ListWithCursor, OpaqueOverlay};
 use sherlog::RegexFilter;
 
 #[derive(Default)]
@@ -180,7 +180,7 @@ impl FilterList {
 }
 
 impl RenderWithState for FilterList {
-    type Widget<'a> = OverlayBlock<ListWithCursor<'a>>;
+    type Widget<'a> = OpaqueOverlay<ListWithCursor<'a>>;
 
     fn widget(
         &mut self,
@@ -189,17 +189,23 @@ impl RenderWithState for FilterList {
         &mut <Self::Widget<'_> as tui::widgets::StatefulWidget>::State,
     ) {
         (
-            OverlayBlock::new(ListWithCursor {
+            OpaqueOverlay(ListWithCursor {
                 list: List::new(
                     self.entries
                         .iter()
                         .map(Self::build_list_item)
                         .collect::<Vec<_>>(),
                 )
+                .block(
+                    Block::default()
+                        .border_type(BorderType::Rounded)
+                        .borders(Borders::all())
+                        .title("Filters"),
+                )
                 .highlight_style(Style::default().fg(Color::Yellow)),
+
                 cursor: self.cursor(),
-            })
-            .border(BorderType::Double, Style::default().fg(Color::Green)),
+            }),
             &mut self.state,
         )
     }

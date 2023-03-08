@@ -2,19 +2,29 @@
 
 ## Priority
 
-- [ ] Print line numbers
+- [ ] Print line numbers with toggle command
 - [ ] Fix filter list cursor y coordinate for more filters than overlay can fit
-- [ ] Allow logging in the background
-- [ ] Fix scrolling multiple lines when text is wrapped
+- [ ] printing search matches count and position
+- [ ] Print active filters on status line
+- [ ] Use plaintext patterns by default. With easy promotion to regex.
+- [ ] Highlight all filter matches
 
 ## Less priority
 
+- [ ] Custom paragraph implementation
+      - [ ] Properly handle scrolling wrapped text
+      - [ ] Fix problems with scrolling near the end of displayed text
+      - [ ] Adds possibility to implement text selection (enables copying text, creating filters)
+- [ ] Custom list implementation
+      - [ ] Properly handle cursor rendering (problems with list longer than display area heignt)
+      - [ ] Allow Spans in list elements
 - [ ] Esc cancels filter changes, both single line and whole view
-- [ ] printing search matches count and position
 - [ ] allow commands (:) with filter view
 - [ ] send event description to status line/log on user actions (e.g. Filter disabled, filter negated etc)
-- [ ] Print active filters on status line
-- [ ] Use plaintext patterns by default. With easy promotion to regex.
+- [ ] Proper handling for displayed text - not requiring requesting exact number of lines
+      Paragraph should provide feedback after rendering which lines were actually displayed to allow seamless
+      scrolling from bottommost position.
+- [ ] Fix scrolling multiple lines when text is wrapped (requires "Proper handling for displayed text")
 
 ## Hall of fame
 
@@ -37,3 +47,5 @@
 - [x] placeholder text for empty filter list (press a to add new filter...)
 - [x] Fix scrolling past first
 - [x] Fix scrolling past last shown
+- [x] Allow logging in the background
+- [x] Use native box for filter list (instead of OverlayBlock)
