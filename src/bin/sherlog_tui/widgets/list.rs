@@ -1,3 +1,4 @@
+use tui::layout::Rect;
 use tui::widgets::{List, StatefulWidget};
 
 use crate::ty::{Cursor, RenderCursor};
@@ -24,6 +25,13 @@ impl<'a> StatefulWidget for ListWithCursor<'a> {
 
 impl RenderCursor for ListWithCursor<'_> {
     fn cursor(&self, area: tui::layout::Rect) -> Option<Cursor> {
-        self.cursor.map(|c| c.inside(area))
+        // Cannot query if the list inside has borders. For now we assume that it has.
+        let inner = Rect {
+            x: area.x + 1,
+            y: area.y + 1,
+            width: area.width.saturating_sub(2),
+            height: area.height.saturating_sub(2),
+        };
+        self.cursor.map(|c| c.inside(inner))
     }
 }
